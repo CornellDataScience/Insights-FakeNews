@@ -13,6 +13,22 @@ _wnl = nltk.WordNetLemmatizer()
 analyzer = SentimentIntensityAnalyzer()
 
 """
+stolen from SO: https://stackoverflow.com/questions/25534214/nltk-wordnet-lemmatizer-shouldnt-it-lemmatize-all-inflections-of-a-word
+i/o: string representing POS tag
+"""
+def is_noun(tag):
+    return tag in ['NN', 'NNS', 'NNP', 'NNPS']
+
+def is_verb(tag):
+    return tag in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+
+def is_adverb(tag):
+    return tag in ['RB', 'RBR', 'RBS']
+
+def is_adjective(tag):
+    return tag in ['JJ', 'JJR', 'JJS']
+
+"""
 imput: string
 output: string
 """
@@ -30,9 +46,17 @@ def get_tokenized_lemmas(s):
 imput: string
 output: string
 """
-def clean(s):
+def clean_lower(s):
     # Cleans a string: Lowercasing, trimming, removing non-alphanumeric
     return " ".join(re.findall(r'\w+', s, flags=re.UNICODE)).lower()
+
+"""
+imput: string
+output: string
+"""
+def clean(s):
+    # Cleans a string: trimming, removing non-alphanumeric
+    return " ".join(re.findall(r'\w+', s, flags=re.UNICODE))
 
 """
 input: string list
