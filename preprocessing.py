@@ -17,7 +17,8 @@ analyzer = SentimentIntensityAnalyzer()
 
 """
 stolen from SO: https://stackoverflow.com/questions/25534214/nltk-wordnet-lemmatizer-shouldnt-it-lemmatize-all-inflections-of-a-word
-i/o: string representing POS tag
+i: string representing POS tag
+o: bool
 """
 def is_noun(tag):
     return tag in ['NN', 'NNS', 'NNP', 'NNPS']
@@ -32,6 +33,7 @@ def is_adjective(tag):
     return tag in ['JJ', 'JJR', 'JJS']
 
 """
+takes word and lemmatizes/makes lowercase
 imput: string
 output: string
 """
@@ -39,6 +41,7 @@ def normalize_word(w):
     return _wnl.lemmatize(w).lower()
 
 """
+lemmatized, lowercased tokens
 input: string
 output: string list
 """
@@ -46,39 +49,36 @@ def get_tokenized_lemmas(s):
     return [normalize_word(t) for t in nltk.word_tokenize(s)]
 
 """
+lowercased tokens - for use w/ word embeddings
+input: string
+output: string list
+"""
+def get_tokens(s):
+    return [lower(t) for t in nltk.word_tokenize(s)]
+
+"""
+Cleans a string: Lowercasing, trimming, removing non-alphanumeric
 imput: string
 output: string
 """
 def clean_lower(s):
-    # Cleans a string: Lowercasing, trimming, removing non-alphanumeric
     return " ".join(re.findall(r'\w+', s, flags=re.UNICODE)).lower()
 
 """
+Cleans a string: trimming, removing non-alphanumeric
 imput: string
 output: string
 """
 def clean(s):
-    # Cleans a string: trimming, removing non-alphanumeric
     return " ".join(re.findall(r'\w+', s, flags=re.UNICODE))
 
 """
+Removes stopwords from a list of tokens
 input: string list
 output: string list
 """
 def remove_stopwords(l):
-    # Removes stopwords from a list of tokens
     return [w for w in l if w not in feature_extraction.text.ENGLISH_STOP_WORDS]
-
-"""
-imput: string
-output: string list
-"""
-def ngrams(input, n):
-    input = input.split(' ')
-    output = []
-    for i in range(len(input) - n + 1):
-        output.append(input[i:i + n])
-    return output
 
 """
 input: row number, dataframe (train_stances)
@@ -227,7 +227,8 @@ def process_body(body):
         "sentiment": vader_sentiment,
         "first_sentence": first_sentence_data,
         "adj_types": adj_types,
-        "adv_types": adv_types
+        "adv_types": adv_types,
+        "vocabulary": set(clean_tokens)
     }
 
 """
