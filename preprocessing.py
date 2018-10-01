@@ -182,7 +182,7 @@ def build_idf_tokens(corpus, pos_tags = None):
             vocabulary[i]+=1
     idf = {}
     for i in vocabulary:
-        idf[i] = np.log(num_docs/vocabulary[i])
+        idf[i] = np.log(num_docs/(vocabulary[i]+1))
     return idf
 
 """
@@ -256,6 +256,7 @@ def process_body(body, idf = None):
 
     num_nouns = len(nouns)
     num_verbs = len(verbs)
+    doc_len = len(tokens)
 
     n_counter = Counter(nouns)
     v_counter = Counter(verbs)
@@ -269,22 +270,23 @@ def process_body(body, idf = None):
         avg_idf = float(sum(idf.values())) / len(idf)
         n_tfidf, v_tfidf = {},{}
         for n in n_counter:
-            n_tfidf[n] = (n_counter[n]/num_nouns)*(idf[n] if n in idf else avg_idf)
+            n_tfidf[n] = (n_counter[n]/doc_len)*(idf[n] if n in idf else avg_idf)
         for v in v_counter:
-            v_tfidf[v] = (v_counter[v]/num_verbs)*(idf[v] if v in idf else avg_idf) 
+            v_tfidf[v] = (v_counter[v]/doc_len)*(idf[v] if v in idf else avg_idf) 
         common_nouns = sorted(n_tfidf, key=n_tfidf.get, reverse=True)[:10]
         common_verbs = sorted(v_tfidf, key=v_tfidf.get, reverse=True)[:10]
         common_bigrams = [x[0] for x in b_counter.most_common(10)]
 
     # common_verbs = sorted(verb_counter, key=verb_counter.get, reverse=True)[:10]
-
+    n_adj = len(adjectives)
+    n_adv = len(adverbs)
     #breakdown of porportion of regular/comparative/superlative adverbs as a tuple (in that order)
-    if len(adjectives)!=0:
-        adj_types = (tags_count['JJ']/len(adjectives),tags_count['JJR']/len(adjectives),tags_count['JJS']/len(adjectives))
+    if n_adj!=0:
+        adj_types = (tags_count['JJ']/n_adj,tags_count['JJR']/n_adj,tags_count['JJS']/n_adj)
     else:
         adj_types = (0,0,0)
-    if len(adverbs)!=0:
-        adv_types = (tags_count['RB']/len(adjectives),tags_count['RBR']/len(adjectives),tags_count['RBS']/len(adjectives))
+    if n_adv!=0:
+        adv_types = (tags_count['RB']/n_adv,tags_count['RBR']/n_adv,tags_count['RBS']/n_adv)
     else:
         adv_types = (0,0,0)
 
@@ -319,7 +321,7 @@ def process_bodies(df, idf = None):
     for i in range(len(ids)):
         if i%100 == 0 and i!=0:
             print("processed "+str(i))
-        body_info[ids[i]]= process_body(get_body(6, df), idf)
+        body_info[ids[i]]= process_body(get_body(ids[i], df), idf)
     print("done! processed "+ str(len(ids)))
     return body_info
 
@@ -332,6 +334,6 @@ def process_bodies_list(df, id_list, idf = None):
     for i in range(len(id_list)):
         if i%100 == 0 and i!=0:
             print("processed "+str(i))
-        body_info[id_list[i]]= process_body(get_body(6, df), idf)
+        body_info[id_list[i]]= process_body(get_body(ids[i], df), idf)
     print("done! processed "+ str(len(id_list)))
     return body_info
