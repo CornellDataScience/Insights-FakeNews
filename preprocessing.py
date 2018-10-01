@@ -80,6 +80,12 @@ output: string list
 def remove_stopwords(l):
     return [w for w in l if w not in feature_extraction.text.ENGLISH_STOP_WORDS]
 
+def get_clean_tokens(body):
+    clean_body = clean(body)
+    tokens = get_tokenized_lemmas(clean_body)
+    clean_tokens = remove_stopwords(tokens)
+    return clean_tokens
+
 """
 input: row number, dataframe (train_stances)
 output: string of headline
@@ -136,13 +142,48 @@ def build_vocabulary(df, col, pos_tags = None):
         clean_body = clean(body)
         tokens = get_tokenized_lemmas(clean_body)
         clean_tokens = remove_stopwords(tokens)
-        pos = nltk.pos_tag(clean_tokens)
         if pos_tags is None:
             filtered_tokens = clean_tokens
         else:
+            pos = nltk.pos_tag(clean_tokens)
             filtered_tokens = [x[0] for x in pos if (x[1] in pos_tags)]
-        vocabulary = vocabulary.union(set(nouns))
+        vocabulary = vocabulary.union(set(filtered_tokens))
     return list(vocabulary)
+
+"""
+in: 2d list of strings
+out: set of strings
+"""
+def build_vocabulary_tokens(corpus, pos_tags = None):
+    vocabulary = set()
+    for wordlist in list(corpus):
+        if pos_tags is None:
+            filtered_tokens = clean_tokens
+        else:
+            pos = nltk.pos_tag(wordlist)
+            filtered_tokens = [x[0] for x in pos if (x[1] in pos_tags)]
+        vocabulary = vocabulary.union(set(filtered_tokens))
+    return list(vocabulary)
+
+"""
+in: 2d list of strings
+out: dict of string -> idf score (float)
+"""
+def build_idf_tokens(corpus, pos_tags = None):
+    num_docs = len(corpus)
+    vocabulary = Counter()
+    for wordlist in list(corpus):
+        if pos_tags is None:
+            filtered_tokens = wordlist
+        else:
+            pos = nltk.pos_tag(wordlist)
+            filtered_tokens = [x[0] for x in pos if (x[1] in pos_tags)]
+        for i in set(filtered_tokens):
+            vocabulary[i]+=1
+    idf = {}
+    for i in vocabulary:
+        idf[i] = np.log(num_docs/vocabulary[i])
+    return idf
 
 """
 extract metadata from sentence/body of text
@@ -183,9 +224,13 @@ def process_sentence(s):
         "sentiment": vader_sentiment
     }
 
+"""
+in: string, idf dictionary (string->float) [optional]
+out: mixed dictionary
+"""
 # example usage:
 # process_body(get_body(6, train_bodies))['pos_count']
-def process_body(body):
+def process_body(body, idf = None):
     clean_body = clean(body)
     tokens = get_tokenized_lemmas(clean_body)
     clean_tokens = remove_stopwords(tokens)
@@ -208,10 +253,40 @@ def process_body(body):
     verbs = [x[0] for x in pos if is_verb(x[1])]
     adjectives = [x[0] for x in pos if is_adjective(x[1])]
     adverbs = [x[0] for x in pos if is_adverb(x[1])]
+
+    num_nouns = len(nouns)
+    num_verbs = len(verbs)
+
+    n_counter = Counter(nouns)
+    v_counter = Counter(verbs)
+    b_counter = Counter(bigram)
     
+    if idf == None:
+        common_nouns = [x[0] for x in n_counter.most_common(10)]
+        common_verbs = [x[0] for x in v_counter.most_common(10)]
+        common_bigrams = [x[0] for x in b_counter.most_common(10)]
+    else:
+        avg_idf = float(sum(idf.values())) / len(idf)
+        n_tfidf, v_tfidf = {},{}
+        for n in n_counter:
+            n_tfidf[n] = (n_counter[n]/num_nouns)*(idf[n] if n in idf else avg_idf)
+        for v in v_counter:
+            v_tfidf[v] = (v_counter[v]/num_verbs)*(idf[v] if v in idf else avg_idf) 
+        common_nouns = sorted(n_tfidf, key=n_tfidf.get, reverse=True)[:10]
+        common_verbs = sorted(v_tfidf, key=v_tfidf.get, reverse=True)[:10]
+        common_bigrams = [x[0] for x in b_counter.most_common(10)]
+
+    # common_verbs = sorted(verb_counter, key=verb_counter.get, reverse=True)[:10]
+
     #breakdown of porportion of regular/comparative/superlative adverbs as a tuple (in that order)
-    adj_types = (tags_count['JJ']/len(adjectives),tags_count['JJR']/len(adjectives),tags_count['JJS']/len(adjectives))
-    adv_types = (tags_count['RB']/len(adjectives),tags_count['RBR']/len(adjectives),tags_count['RBS']/len(adjectives))
+    if len(adjectives)!=0:
+        adj_types = (tags_count['JJ']/len(adjectives),tags_count['JJR']/len(adjectives),tags_count['JJS']/len(adjectives))
+    else:
+        adj_types = (0,0,0)
+    if len(adverbs)!=0:
+        adv_types = (tags_count['RB']/len(adjectives),tags_count['RBR']/len(adjectives),tags_count['RBS']/len(adjectives))
+    else:
+        adv_types = (0,0,0)
 
     vader_sentiment = sentiment_multi(body)
     
@@ -228,19 +303,35 @@ def process_body(body):
         "first_sentence": first_sentence_data,
         "adj_types": adj_types,
         "adv_types": adv_types,
-        "vocabulary": set(clean_tokens)
+        "vocabulary": set(clean_tokens),
+        "common_nouns": common_nouns,
+        "common_verbs": common_verbs,
+        "common_bigrams": common_bigrams
     }
 
 """
-in: bodies dataframe with Body ID and articleBody columns
+in: bodies dataframe with Body ID and articleBody columns, idf dict (string->float) [optional]
 out: dict with k=bodyid and v=dict of bodyinfo as per process_body
 """
-def process_bodies(df)
+def process_bodies(df, idf = None):
     body_info = {}
     ids = list(df["Body ID"])
     for i in range(len(ids)):
         if i%100 == 0 and i!=0:
             print("processed "+str(i))
-        body_info[ids[i]]= process_body(get_body(6, df))
+        body_info[ids[i]]= process_body(get_body(6, df), idf)
     print("done! processed "+ str(len(ids)))
+    return body_info
+
+"""
+in: dataframe, list of body id's from that dataframe, idf dict (string->float) [optional]
+out: dict with k=bodyid and v=dict of bodyinfo as per process_body
+"""
+def process_bodies_list(df, id_list, idf = None):
+    body_info = {}
+    for i in range(len(id_list)):
+        if i%100 == 0 and i!=0:
+            print("processed "+str(i))
+        body_info[id_list[i]]= process_body(get_body(6, df), idf)
+    print("done! processed "+ str(len(id_list)))
     return body_info
