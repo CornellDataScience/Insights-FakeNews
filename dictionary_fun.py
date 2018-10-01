@@ -52,6 +52,6 @@ def tag_tokens(dictionary):
     """
     new_dict = dict()
     for x in dictionary:
-        tagged = nltk.nltk.post_tag(dictionary.get(x))
+        tagged = nltk.pos_tag(dictionary.get(x))
         new_dict.update({x:tagged})
     return new_dict
