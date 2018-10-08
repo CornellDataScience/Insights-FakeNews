@@ -186,7 +186,7 @@ out: float
 """
 
 
-def bow_cosine_similarity(a, b):
+def bow_cos_similarity(a, b):
     vocab = shared_vocab(a, b)
     a_bow, b_bow = set(a), set(b)
     if len(a) == 0 or len(b) == 0:
@@ -251,11 +251,11 @@ out: float
 
 def score_sentence(sentence, tf, idf=None):
     acc = 0
-    avg_idf = idf["_avg"]
     if idf == None:
         for token in sentence:
             acc += tf[token]
     else:
+        avg_idf = idf["_avg"]
         for token in sentence:
             if token in idf:
                 acc += tf[token]*idf[token]
@@ -379,8 +379,8 @@ def process_body(body, idf=None):
         for v in v_counter:
             v_tfidf[v] = (v_counter[v]/doc_len) * \
                 (idf[v] if v in idf else avg_idf)
-        common_nouns = sorted(n_tfidf, key=n_tfidf.get, reverse=True)[:10]
-        common_verbs = sorted(v_tfidf, key=v_tfidf.get, reverse=True)[:10]
+        common_nouns = sorted(n_tfidf, key=n_tfidf.get, reverse=True)[:5]
+        common_verbs = sorted(v_tfidf, key=v_tfidf.get, reverse=True)[:5]
 
         sentence_importance = [
             (s, score_sentence(s, word_count, idf)) for s in clean_sentences]
@@ -593,10 +593,10 @@ def get_feats(data, body_dict, idf=None):
         'cos_trigrams_sig': cos_trigrams_sig,
         'cos_tokens_sig': cos_tokens_sig,
 
-        'cos_nouns_fst': cos_nouns_fst,
-        'cos_bigrams_fst': cos_bigrams_fst,
-        'cos_trigrams_fst': cos_trigrams_fst,
-        'cos_tokens_fst': cos_tokens_fst,
+        'cos_nouns_fst': cos_nouns_first,
+        'cos_bigrams_fst': cos_bigrams_first,
+        'cos_trigrams_fst': cos_trigrams_first,
+        'cos_tokens_fst': cos_tokens_first,
 
         'sentiment_pos': sentiment_diff['pos'],
         'sentiment_neg': sentiment_diff['neg'],
