@@ -1,4 +1,9 @@
 """
+FUNCTIONS FOR PREPROCESSING AND FEATURE ENGINEERING - pending reorganization
+"""
+
+
+"""
 Helpers borrowed from baseline implementation in feature_engineering.py
 """
 
@@ -72,7 +77,7 @@ out: string list
 
 
 def get_tokens(s):
-    return [lower(t) for t in nltk.word_tokenize(s)]
+    return [t.lower() for t in nltk.word_tokenize(s)]
 
 
 """
@@ -613,3 +618,4 @@ def get_feats(data, body_dict, idf=None):
         'sentiment_neu_sig': sentiment_diff_sig['neu'],
         'sentiment_compound_sig': sentiment_diff_sig['compound']
     }
+
