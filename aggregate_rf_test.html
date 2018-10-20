@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+</style>
+
+<body>
+    <script src="http://d3js.org/d3.v4.min.js"></script>
+    <script>
+        var height = 400;
+        var width = 1700;
+
+        var svg = d3.select("body").append("svg").attr("width", width).attr("height", 1000);
+
+        d3.json("test_rf_dump.json",
+            function (error, data) {
+                nodes = [];
+                data["trees"].forEach(tree => {
+                    Object.entries(tree["nodes"]).forEach(([id, node]) => {
+                        nodes.push(node);
+                    });
+                });
+                features = data["feature_names"];
+
+                nodes_ft_count = {};
+                avg_ft_importance = data["trees"].map(t => t.feature_importances).reduce(function (r, a) {
+                    a.forEach(function (b, i) {
+                        r[i] = (r[i] || 0) + b;
+                    });
+                    return r;
+                }, []).map(f => f / (data["trees"].length));
+
+                features.forEach(ftname => {
+                    nodes_ft_count[ftname] = 0;
+                });
+                nodes.forEach(node => {
+                    nodes_ft_count[node["feature"]] += 1;
+                });
+                nodes_ft_count_data = [];
+                Object.entries(nodes_ft_count).forEach(
+                    ([key, value]) => nodes_ft_count_data.push({
+                        "feature": key,
+                        "node_count": value
+                    })
+                );
+
+                ft_importance_data = [];
+                for (var i = 0; i < features.length; i++) {
+                    ft_importance_data.push({
+                        "feature": features[i],
+                        "importance": avg_ft_importance[i]
+                    });
+                }
+
+                var ft_barScale = d3.scaleBand()
+                    .domain(nodes_ft_count_data.map(d => d.feature))
+                    .range([100, width / 2])
+                    .padding(0.1);
+                var ft_yScale = d3.scaleLinear()
+                    .domain([0, d3.max(nodes_ft_count_data, d => d.node_count)]).nice()
+                    .range([height - 25, 25]);
+                var importance_yScale = d3.scaleLinear()
+                    .domain([0, d3.max(ft_importance_data, d => d.importance)]).nice()
+                    .range([height - 25, 25]);
+
+                // graph 1
+                svg.append("g")
+                    .attr("fill", "steelblue")
+                    .selectAll("rect").data(nodes_ft_count_data).enter().append("rect")
+                    .attr("x", d => ft_barScale(d.feature))
+                    .attr("y", d => ft_yScale(d.node_count))
+                    .attr("height", d => ft_yScale(0) - ft_yScale(d.node_count))
+                    .attr("width", ft_barScale.bandwidth());
+
+                svg.append("g").attr("transform", "translate(0," + (height - 25).toString() + ")")
+                    .call(d3.axisBottom(ft_barScale)
+                        .tickSizeOuter(0))
+                    .selectAll("text")
+                    .attr("y", 0)
+                    .attr("x", 9)
+                    .attr("dy", ".35em")
+                    .attr("transform", "rotate(90)")
+                    .style("text-anchor", "start");
+
+                svg.append("g").attr("transform", "translate(100,0)")
+                    .call(d3.axisLeft(ft_yScale)
+                        .tickSizeOuter(0));
+
+                //graph 2
+                svg.append("g")
+                    .attr("fill", "steelblue")
+                    .selectAll("rect").data(nodes_ft_count_data).enter().append("rect")
+                    .attr("x", d => ft_barScale(d.feature))
+                    .attr("y", d => ft_yScale(d.node_count)+500)
+                    .attr("height", d => ft_yScale(0) - ft_yScale(d.node_count))
+                    .attr("width", ft_barScale.bandwidth());
+
+                svg.append("g").attr("transform", "translate(0," + (height - 25+500).toString() + ")")
+                    .call(d3.axisBottom(ft_barScale)
+                        .tickSizeOuter(0))
+                    .selectAll("text")
+                    .attr("y", 0)
+                    .attr("x", 9)
+                    .attr("dy", ".35em")
+                    .attr("transform", "rotate(90)")
+                    .style("text-anchor", "start");
+
+                svg.append("g").attr("transform", "translate(100,500)")
+                    .call(d3.axisLeft(importance_yScale)
+                        .tickSizeOuter(0));
+            });
+    </script>
+</body>
