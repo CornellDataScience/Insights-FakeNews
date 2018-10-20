@@ -9,27 +9,28 @@
     <script>
         var height = 400;
         var width = 1700;
-
-        var svg = d3.select("body").append("svg").attr("width", width).attr("height", 1000);
+        d3.select("body").append("h2").text("# Nodes Splitting on Feature");
+        var svg = d3.select("body").append("svg").attr("width", width).attr("height", 500);
+        d3.select("body").append("h2").text("Average Feature Importance");
+        var svg2 = d3.select("body").append("svg").attr("width", width).attr("height", 500);
 
         d3.json("test_rf_dump.json",
             function (error, data) {
-                nodes = [];
+                // build list of nodes
+                var nodes = [];
                 data["trees"].forEach(tree => {
                     Object.entries(tree["nodes"]).forEach(([id, node]) => {
                         nodes.push(node);
                     });
                 });
-                features = data["feature_names"];
+                var features = data["feature_names"];
 
-                nodes_ft_count = {};
-                avg_ft_importance = data["trees"].map(t => t.feature_importances).reduce(function (r, a) {
-                    a.forEach(function (b, i) {
-                        r[i] = (r[i] || 0) + b;
-                    });
-                    return r;
-                }, []).map(f => f / (data["trees"].length));
+                var get_thresholds = function (ft_name) {
+                    return nodes.filter(n => n['feature'] === ft_name).map(n => n['threshold']);
+                }
 
+                // how many nodes split on each feature
+                var nodes_ft_count = {};
                 features.forEach(ftname => {
                     nodes_ft_count[ftname] = 0;
                 });
@@ -44,7 +45,15 @@
                     })
                 );
 
-                ft_importance_data = [];
+                // average importance score of each feature across all trees in the rf
+                var avg_ft_importance = data["trees"].map(t => t.feature_importances).reduce(function (r, a) {
+                    a.forEach(function (b, i) {
+                        r[i] = (r[i] || 0) + b;
+                    });
+                    return r;
+                }, []).map(f => f / (data["trees"].length));
+
+                var ft_importance_data = [];
                 for (var i = 0; i < features.length; i++) {
                     ft_importance_data.push({
                         "feature": features[i],
@@ -52,18 +61,16 @@
                     });
                 }
 
+                // graph 1
                 var ft_barScale = d3.scaleBand()
                     .domain(nodes_ft_count_data.map(d => d.feature))
                     .range([100, width / 2])
                     .padding(0.1);
+
                 var ft_yScale = d3.scaleLinear()
                     .domain([0, d3.max(nodes_ft_count_data, d => d.node_count)]).nice()
                     .range([height - 25, 25]);
-                var importance_yScale = d3.scaleLinear()
-                    .domain([0, d3.max(ft_importance_data, d => d.importance)]).nice()
-                    .range([height - 25, 25]);
 
-                // graph 1
                 svg.append("g")
                     .attr("fill", "steelblue")
                     .selectAll("rect").data(nodes_ft_count_data).enter().append("rect")
@@ -73,8 +80,7 @@
                     .attr("width", ft_barScale.bandwidth());
 
                 svg.append("g").attr("transform", "translate(0," + (height - 25).toString() + ")")
-                    .call(d3.axisBottom(ft_barScale)
-                        .tickSizeOuter(0))
+                    .call(d3.axisBottom(ft_barScale).tickSizeOuter(0))
                     .selectAll("text")
                     .attr("y", 0)
                     .attr("x", 9)
@@ -83,21 +89,23 @@
                     .style("text-anchor", "start");
 
                 svg.append("g").attr("transform", "translate(100,0)")
-                    .call(d3.axisLeft(ft_yScale)
-                        .tickSizeOuter(0));
+                    .call(d3.axisLeft(ft_yScale).tickSizeOuter(0));
 
                 //graph 2
-                svg.append("g")
+                var importance_yScale = d3.scaleLinear()
+                    .domain([0, d3.max(ft_importance_data, d => d.importance)]).nice()
+                    .range([height - 25, 25]);
+
+                svg2.append("g")
                     .attr("fill", "steelblue")
-                    .selectAll("rect").data(nodes_ft_count_data).enter().append("rect")
+                    .selectAll("rect").data(ft_importance_data).enter().append("rect")
                     .attr("x", d => ft_barScale(d.feature))
-                    .attr("y", d => ft_yScale(d.node_count)+500)
-                    .attr("height", d => ft_yScale(0) - ft_yScale(d.node_count))
+                    .attr("y", d => importance_yScale(d.importance))
+                    .attr("height", d => importance_yScale(0) - importance_yScale(d.importance))
                     .attr("width", ft_barScale.bandwidth());
 
-                svg.append("g").attr("transform", "translate(0," + (height - 25+500).toString() + ")")
-                    .call(d3.axisBottom(ft_barScale)
-                        .tickSizeOuter(0))
+                svg2.append("g").attr("transform", "translate(0," + (height - 25).toString() + ")")
+                    .call(d3.axisBottom(ft_barScale).tickSizeOuter(0))
                     .selectAll("text")
                     .attr("y", 0)
                     .attr("x", 9)
@@ -105,9 +113,54 @@
                     .attr("transform", "rotate(90)")
                     .style("text-anchor", "start");
 
-                svg.append("g").attr("transform", "translate(100,500)")
-                    .call(d3.axisLeft(importance_yScale)
-                        .tickSizeOuter(0));
+                svg2.append("g").attr("transform", "translate(100,0)")
+                    .call(d3.axisLeft(importance_yScale).tickSizeOuter(0));
+
+                var make_hist = function (ft_number) {
+                    var hist_data = get_thresholds(features[ft_number]);
+                    d3.select("body").append("h4").text(features[ft_number])
+                    var svg_hist = d3.select("body").append("svg").attr("width", 800).attr("height", 300);
+
+                    var hist_x = d3.scaleLinear()
+                        .domain(d3.extent(hist_data))
+                        .rangeRound([50, 550]);
+                    var bins = d3.histogram()
+                        .domain(hist_x.domain())
+                        .thresholds(hist_x.ticks(50))(hist_data);
+
+                    var hist_y = d3.scaleLinear().range([275, 25]).domain([0, d3.max(bins, function (d) {
+                        return d.length;
+                    })]);
+
+                    svg_hist.selectAll("rect")
+                        .data(bins)
+                        .enter().append("rect")
+                        .attr("class", "bar")
+                        .attr("fill", "steelblue")
+                        .attr("x", 1)
+                        .attr("transform", function (d) {
+                            var x0 = hist_x(d.x0);
+                            return "translate(" + (x0 === x0 ? x0 : 0) + "," +
+                                hist_y(d.length) + ")";
+                        })
+                        .attr("width", function (d) {
+                            var w = hist_x(d.x1) - hist_x(d.x0) + 1;
+                            return (w === w ? w : 15);
+                        })
+                        .attr("height", function (d) {
+                            return 275 - hist_y(d.length);
+                        });
+                    // add the x Axis
+                    svg_hist.append("g")
+                        .call(d3.axisBottom(hist_x)).attr("transform", "translate(0,275)");
+                    // add the y Axis
+                    svg_hist.append("g").call(d3.axisLeft(hist_y)).attr("transform", "translate(50,0)");
+                }
+
+                //make histogram of thresholds for all features
+                for (var i = 0; i < features.length; i++) {
+                    make_hist(i);
+                }
             });
     </script>
 </body>
