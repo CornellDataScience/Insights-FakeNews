@@ -49,7 +49,7 @@ def tree_to_dict(tree_, feature_names):
             "feature": feature_names[feature[i]],
             "threshold": threshold[i]    
         }
-    return nodes
+    return {'_n_nodes':int(n_nodes), "nodes": nodes}
 
 """
 in: trained scikit random forest model, string list of feature names
@@ -57,12 +57,15 @@ out: list of dicts representation of trees for JSON dump
 """
 def rf_to_dict(model, feature_names):
     trees = [x.tree_ for x in model.estimators_]
-    return [tree_to_dict(tree,feature_names) for tree in trees]
+    return {"feature_names":feature_names, "trees":[tree_to_dict(tree,feature_names) for tree in trees]}
 
 """
 creates json dump of RF data
-in: model, feature names (see rf_to_dict), string of output file name
+in: trained scikit random forest model, string list of feature names, string of output file name
 out: none
+
+usage example:
+utils.rf_json_dump(model, list(train_df), "test_rf_dump.json")
 """
 def rf_json_dump(model, feature_names, out_file):
     data = rf_to_dict(model, feature_names)
