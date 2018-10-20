@@ -41,11 +41,11 @@ def tree_to_dict(tree_, feature_names):
     nodes = {}
     for i in range(n_nodes):
         nodes[i] = {
-            "is_leaf": is_leaves[i],
-            "depth": node_depth[i],
-            "id": i,
-            "children_l": children_left[i],
-            "children_r": children_right[i],
+            "is_leaf": 1 if is_leaves[i] else 0,
+            "depth": int(node_depth[i]),
+            "id": int(i),
+            "children_l": int(children_left[i]),
+            "children_r": int(children_right[i]),
             "feature": feature_names[feature[i]],
             "threshold": threshold[i]    
         }
