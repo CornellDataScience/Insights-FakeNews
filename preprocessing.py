@@ -18,6 +18,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from collections import Counter
 from scipy import spatial
 
+import spacy
+nlp = spacy.load("en")
+
 _wnl = nltk.WordNetLemmatizer()
 analyzer = SentimentIntensityAnalyzer()
 
@@ -200,6 +203,39 @@ def bow_cos_similarity(a, b):
     b_vec = [(1 if i in b_bow else 0) for i in vocab]
     return spatial.distance.cosine(a_vec, b_vec)
 
+'''
+extracts the subject, verb, and object of a sentence, 
+including news headlines and body text
+in: string (sentence)
+out: triple of (subj, verb, obj)
+'''
+def extract_SVO(sent):
+    subj = ""
+    verb = ""
+    obj = ""
+    subjFound = False
+    verbFound = False
+    objFound = False
+    
+    tokenized_sent = nlp(sent)
+
+    for token in tokenized_sent:
+        if (token.dep_ == "nsubj" and subjFound == False):
+            subj = token.text
+            subjFound = True
+        
+        if (token.pos_ == "VERB" and verbFound == False):
+            verb = token.text
+            verbFound = True
+        elif (token.head.pos_ == "VERB" and verbFound == False):
+            verb = token.head.text
+            verbFound = True
+        
+        if (token.dep_ == "dobj" or token.dep_ == "pobj" and objFound == False):
+            obj = token.text
+            objFound = True
+        
+    return (subj, verb, obj)
 
 """
 helper function for IDF's
