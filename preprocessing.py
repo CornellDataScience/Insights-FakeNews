@@ -189,8 +189,6 @@ cosine similarity of two bags of words
 in: 2 string lists
 out: float
 """
-
-
 def bow_cos_similarity(a, b):
     vocab = shared_vocab(a, b)
     a_bow, b_bow = set(a), set(b)
@@ -360,6 +358,7 @@ def process_body(body, idf=None):
     v_counter = Counter(verbs)
     b_counter = Counter(bigram)
     t_counter = Counter(trigram)
+    token_counter = Counter(clean_tokens)
 
     # common words are highest scoring IDF (or TF if IDF not available)
     # significant sentence - sentence with highest average token IDF score
@@ -367,6 +366,7 @@ def process_body(body, idf=None):
     if idf == None:
         common_nouns = [x[0] for x in n_counter.most_common(5)]
         common_verbs = [x[0] for x in v_counter.most_common(5)]
+        common_tokens = [x[0] for x in token_counter.most_common(5)]
         # this is really shitty
         sentence_importance = [(s, score_sentence(s, word_count))
                                for s in clean_sentences]
@@ -377,15 +377,19 @@ def process_body(body, idf=None):
 
     else:
         avg_idf = idf["_avg"]
-        n_tfidf, v_tfidf = {}, {}
+        n_tfidf, v_tfidf, t_tfidf = {}, {}, {}
         for n in n_counter:
             n_tfidf[n] = (n_counter[n]/doc_len) * \
                 (idf[n] if n in idf else avg_idf)
         for v in v_counter:
             v_tfidf[v] = (v_counter[v]/doc_len) * \
                 (idf[v] if v in idf else avg_idf)
+        for t in token_counter:
+            t_tfidf[t] = (token_counter[t]/doc_len) * \
+                (idf[t] if t in idf else avg_idf)
         common_nouns = sorted(n_tfidf, key=n_tfidf.get, reverse=True)[:5]
         common_verbs = sorted(v_tfidf, key=v_tfidf.get, reverse=True)[:5]
+        common_tokens = sorted(t_tfidf, key=t_tfidf.get, reverse=True)[:5]
 
         sentence_importance = [
             (s, score_sentence(s, word_count, idf)) for s in clean_sentences]
@@ -394,9 +398,9 @@ def process_body(body, idf=None):
         most_significant_sentence_data = process_sentence(
             ' '.join(most_significant_sentence))
 
-    # no idf for bigrams/trigrams :(
-    common_bigrams = [x[0] for x in b_counter.most_common(5)]
-    common_trigrams = [x[0] for x in t_counter.most_common(5)]
+    # no idf for bigrams/trigrams, increase "common" count to 10
+    common_bigrams = [x[0] for x in b_counter.most_common(10)]
+    common_trigrams = [x[0] for x in t_counter.most_common(10)]
 
     n_adj = len(adjectives)
     n_adv = len(adverbs)
@@ -429,6 +433,7 @@ def process_body(body, idf=None):
         "adj_types": adj_types,
         "adv_types": adv_types,
         "vocabulary": set(clean_tokens),
+        "common_tokens": common_tokens,
         "common_nouns": common_nouns,
         "common_verbs": common_verbs,
         "common_bigrams": common_bigrams,
@@ -496,12 +501,12 @@ def get_feats(data, body_dict, idf=None):
         set(body_dict[body_id]['common_nouns'])))
     shared_common_verbs = len(set(headline_data['verbs']).intersection(
         set(body_dict[body_id]['common_verbs'])))
-    shared_tokens = len(set(headline_data['tokens']).intersection(
+    shared_common_tokens = len(set(headline_data['tokens']).intersection(
         set(body_dict[body_id]['tokens'])))
     shared_bigrams = len(set(headline_data['bigrams']).intersection(
-        set(body_dict[body_id]['common_bigrams'])))
+        set(body_dict[body_id]['bigrams'])))
     shared_trigrams = len(set(headline_data['trigrams']).intersection(
-        set(body_dict[body_id]['common_trigrams'])))
+        set(body_dict[body_id]['trigrams'])))
 
     shared_nouns_first = len(set(headline_data['nouns']).intersection(
         set(body_dict[body_id]['first_sentence']['nouns'])))
@@ -579,7 +584,7 @@ def get_feats(data, body_dict, idf=None):
         'shared_verbs': shared_common_verbs,
         'shared_bigrams': shared_bigrams,
         'shared_trigrams': shared_trigrams,
-        'shared_tokens': shared_tokens,
+        'shared_tokens': shared_common_tokens,
 
         'shared_nouns_fst': shared_nouns_first,
         'shared_verbs_fst': shared_verbs_first,

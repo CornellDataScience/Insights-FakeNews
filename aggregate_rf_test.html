@@ -14,6 +14,92 @@
         d3.select("body").append("h2").text("Average Feature Importance");
         var svg2 = d3.select("body").append("svg").attr("width", width).attr("height", 500);
 
+        function make_hist(ft_number, nodes, features) {
+            var hist_data = get_thresholds(features[ft_number], nodes);
+            d3.select("body").append("h3").text(features[ft_number]+" - % of nodes splitting on threshold")
+            var svg_hist = d3.select("body").append("svg").attr("width", 800).attr("height", 300);
+
+            var hist_x = d3.scaleLinear()
+                .domain(d3.extent(hist_data))
+                .rangeRound([50, 750]).nice();
+
+            var hist_y = d3.scaleLinear().range([275, 25]).domain([0, 0.5]); // truncate unbalanced distributions
+
+            var n = hist_data.length,
+                bins = d3.histogram().domain(hist_x.domain()).thresholds(50)(hist_data),
+                density = kernelDensityEstimator(kernelEpanechnikov(3), hist_x.ticks(50))(hist_data),
+                mean = d3.mean(hist_data);
+
+            // draw boxes - errors are expected because some features were never selected to split on
+            svg_hist.selectAll("rect")
+                .data(bins)
+                .enter().append("rect")
+                .attr("fill", "silver")
+                .attr("x", function (d) {
+                    return hist_x(d.x0);
+                })
+                .attr("y", function (d) {
+                    return hist_y(d.length / n);
+                })
+                .attr("width", function (d) {
+                    return hist_x(d.x1) - hist_x(d.x0)+1;
+                })
+                .attr("height", function (d) {
+                    return hist_y(0) - hist_y(d.length / n);
+                });
+
+            // draw density estimate line
+            svg_hist.append("path")
+                .datum(density)
+                .attr("fill", "none")
+                .attr("stroke", "gray")
+                .attr("stroke-width", 1.5)
+                .attr("stroke-linejoin", "round")
+                .attr("d", d3.line()
+                    .curve(d3.curveBasis)
+                    .x(function (d) {
+                        return hist_x(d[0]);
+                    })
+                    .y(function (d) {
+                        return hist_y(d[1]);
+                    }));
+
+            // add the x Axis
+            svg_hist.append("g")
+                .call(d3.axisBottom(hist_x)).attr("transform", "translate(0,275)");
+            svg_hist.append("line")
+            .attr("x1", hist_x(mean))  //<<== change your code here
+            .attr("y1", 25)
+            .attr("x2", hist_x(mean))  //<<== and here
+            .attr("y2", 275)
+            .style("stroke-width", 1)
+            .style("stroke", "steelblue")
+            .style("fill", "none");
+            // add the y Axis
+            svg_hist.append("g").call(d3.axisLeft(hist_y)).attr("transform", "translate(50,0)");
+        }
+
+        // following two functions borrowed from: http://bl.ocks.org/jensgrubert/7777399
+        function kernelDensityEstimator(kernel, X) {
+            return function (V) {
+                return X.map(function (x) {
+                    return [x, d3.mean(V, function (v) {
+                        return kernel(x - v);
+                    })];
+                });
+            };
+        }
+
+        function kernelEpanechnikov(k) {
+            return function (v) {
+                return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
+            };
+        }
+
+        function get_thresholds(ft_name, nodes) {
+            return nodes.filter(n => n['feature'] === ft_name).map(n => n['threshold']);
+        }
+
         d3.json("test_rf_dump.json",
             function (error, data) {
                 // build list of nodes
@@ -24,10 +110,6 @@
                     });
                 });
                 var features = data["feature_names"];
-
-                var get_thresholds = function (ft_name) {
-                    return nodes.filter(n => n['feature'] === ft_name).map(n => n['threshold']);
-                }
 
                 // how many nodes split on each feature
                 var nodes_ft_count = {};
@@ -68,7 +150,7 @@
                     .padding(0.1);
 
                 var ft_yScale = d3.scaleLinear()
-                    .domain([0, d3.max(nodes_ft_count_data, d => d.node_count)]).nice()
+                    .domain([0, 15000]).nice() //truncate COS_TRIGRAMS_FST which has 50k
                     .range([height - 25, 25]);
 
                 svg.append("g")
@@ -116,50 +198,9 @@
                 svg2.append("g").attr("transform", "translate(100,0)")
                     .call(d3.axisLeft(importance_yScale).tickSizeOuter(0));
 
-                var make_hist = function (ft_number) {
-                    var hist_data = get_thresholds(features[ft_number]);
-                    d3.select("body").append("h4").text(features[ft_number])
-                    var svg_hist = d3.select("body").append("svg").attr("width", 800).attr("height", 300);
-
-                    var hist_x = d3.scaleLinear()
-                        .domain(d3.extent(hist_data))
-                        .rangeRound([50, 550]);
-                    var bins = d3.histogram()
-                        .domain(hist_x.domain())
-                        .thresholds(hist_x.ticks(50))(hist_data);
-
-                    var hist_y = d3.scaleLinear().range([275, 25]).domain([0, d3.max(bins, function (d) {
-                        return d.length;
-                    })]);
-
-                    svg_hist.selectAll("rect")
-                        .data(bins)
-                        .enter().append("rect")
-                        .attr("class", "bar")
-                        .attr("fill", "steelblue")
-                        .attr("x", 1)
-                        .attr("transform", function (d) {
-                            var x0 = hist_x(d.x0);
-                            return "translate(" + (x0 === x0 ? x0 : 0) + "," +
-                                hist_y(d.length) + ")";
-                        })
-                        .attr("width", function (d) {
-                            var w = hist_x(d.x1) - hist_x(d.x0) + 1;
-                            return (w === w ? w : 15);
-                        })
-                        .attr("height", function (d) {
-                            return 275 - hist_y(d.length);
-                        });
-                    // add the x Axis
-                    svg_hist.append("g")
-                        .call(d3.axisBottom(hist_x)).attr("transform", "translate(0,275)");
-                    // add the y Axis
-                    svg_hist.append("g").call(d3.axisLeft(hist_y)).attr("transform", "translate(50,0)");
-                }
-
                 //make histogram of thresholds for all features
                 for (var i = 0; i < features.length; i++) {
-                    make_hist(i);
+                    make_hist(i, nodes, features);
                 }
             });
     </script>
