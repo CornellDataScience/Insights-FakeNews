@@ -2,3 +2,5 @@
 __pycache__/*
 .ipynb_checkpoints/*
 word_embeddings/glove*.txt
+word_embeddings/dat*.txt
+word_embeddings/pkl*.txt
