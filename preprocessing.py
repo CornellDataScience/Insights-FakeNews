@@ -19,10 +19,15 @@ from collections import Counter
 from scipy import spatial
 
 import spacy
+import bcolz
+import pickle
+
+"setup after spacy is installed: python -m spacy download en"
 nlp = spacy.load("en")
 
 _wnl = nltk.WordNetLemmatizer()
 analyzer = SentimentIntensityAnalyzer()
+glove_path = "word_embeddings"
 
 """
 stolen from SO: 
@@ -189,7 +194,8 @@ def shared_vocab(a, b):
 
 """
 cosine similarity of two bags of words
-in: 2 string lists
+
+in: 2 string lists - cannot be empty
 out: float
 """
 def bow_cos_similarity(a, b):
@@ -199,7 +205,14 @@ def bow_cos_similarity(a, b):
         return -1
     a_vec = [(1 if i in a_bow else 0) for i in vocab]
     b_vec = [(1 if i in b_bow else 0) for i in vocab]
-    return spatial.distance.cosine(a_vec, b_vec)
+    return 1 - spatial.distance.cosine(a_vec, b_vec)
+
+"""
+just a cosine similarity wrapper
+pls no zero vectors
+"""
+def cosine_similarity(a,b):
+    return 1 - spatial.distance.cosine(a, b)
 
 '''
 extracts the subject, verb, and object of a sentence, 
@@ -659,4 +672,55 @@ def get_feats(data, body_dict, idf=None):
         'sentiment_neu_sig': sentiment_diff_sig['neu'],
         'sentiment_compound_sig': sentiment_diff_sig['compound']
     }
+
+"""
+modified from: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
+
+input should just be the filename with no extensions or directory
+dumps some compressed files into the disk for easier loading/lookup of word embeddings later
+
+usage example: preprocessing.extract_word_embeddings("glove.6B.50d")
+"""
+def extract_word_embeddings(filename):
+    words = []
+    idx = 0
+    word2idx = {}
+    dims = None
+    vectors = bcolz.carray(np.zeros(1), rootdir=f'{glove_path}/{filename}.dat', mode='w')
+
+    with open(f'{glove_path}/{filename}.txt', 'rb') as f:
+        for l in f:
+            line = l.decode().split()
+            word = line[0]
+            words.append(word)
+            word2idx[word] = idx
+            idx += 1
+            vect = np.array(line[1:]).astype(np.float)
+            if idx == 1:
+                dims = len(vect)
+            vectors.append(vect)
+    vectors = bcolz.carray(vectors[1:].reshape((idx, dims)), rootdir=f'{glove_path}/{filename}.dat', mode='w')
+    vectors.flush()
+    pickle.dump(words, open(f'{glove_path}/{filename}_words.pkl', 'wb'))
+    pickle.dump(word2idx, open(f'{glove_path}/{filename}_idx.pkl', 'wb'))
+
+"""
+taken from: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
+
+in: filename of preprocessed glove embeddings (ex: glove.6B.50d), must run extract_word_embeddings first
+out: dict that u can use to look up vectors for words
+
+loading example:
+glove = preprocessing.get_glove_dict("glove.6B.50d")
+
+lookup example:
+glove["the"]
+"""
+def get_glove_dict(name):
+    vectors = bcolz.open(f'{glove_path}/{name}.dat')[:]
+    words = pickle.load(open(f'{glove_path}/{name}_words.pkl', 'rb'))
+    word2idx = pickle.load(open(f'{glove_path}/{name}_idx.pkl', 'rb'))
+
+    glove = {w: vectors[word2idx[w]] for w in words}
+    return glove
 

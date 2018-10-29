@@ -1,6 +1,4 @@
 .DS_Store
 __pycache__/*
 .ipynb_checkpoints/*
-glove*.txt
-glove*.dat
-glove*.pkl
+word_embeddings/glove*.txt
