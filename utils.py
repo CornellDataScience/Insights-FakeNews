@@ -90,7 +90,7 @@ def rules(clf, features, node_index=0):
     else:
         feature = features[clf.tree_.feature[node_index]]
         threshold = clf.tree_.threshold[node_index]
-        node['name'] = '{} > {}'.format(feature, "%3.f" % threshold)
+        node['name'] = '{} > {}'.format(feature, float("%3.f" % threshold))
         node['feature'] = feature
         node['threshold'] = threshold
         left_index = clf.tree_.children_left[node_index]
