@@ -5,6 +5,7 @@ UTILS FUNCTIONS TO HELP WITH VIS
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import json
+import preprocessing
 
 """
 modified from:
@@ -81,10 +82,17 @@ def rules(clf, features, node_index=0):
         count_labels = zip(clf.tree_.value[node_index, 0], labels)
         node['name'] = ', '.join(('{} of {}'.format(int(count), label)
                                   for count, label in count_labels))
+        count_labels = zip(clf.tree_.value[node_index, 0], labels)
+        labels_data = {}
+        for count, label in count_labels:
+            labels_data[str(label)] = int(count)
+        node['leaf_labels'] = labels_data
     else:
         feature = features[clf.tree_.feature[node_index]]
         threshold = clf.tree_.threshold[node_index]
-        node['name'] = '{} > {}'.format(feature, threshold)
+        node['name'] = '{} > {}'.format(feature, "%3.f" % threshold)
+        node['feature'] = feature
+        node['threshold'] = threshold
         left_index = clf.tree_.children_left[node_index]
         right_index = clf.tree_.children_right[node_index]
         node['children'] = [rules(clf, features, right_index),

@@ -56,6 +56,7 @@
                 .enter().append("g")
                 .attr("class", "node")
                 .attr("transform", function (d) {
+                    console.log(d);
                     return "translate(" + d.y + "," + d.x + "),rotate(-90)";
                 })
 
@@ -63,19 +64,13 @@
                 .attr("r", 4);
 
             node.append("text")
-                .attr("dx", function (d) {
-                    console.log(d)
-                    return d.children ? -8 : 8;
+                .attr("dx", 0)
+                .attr("dy", function(d){
+                    return d.depth < 4 ? -8 : (d.parent.children[0].name == d.name ? -15 : 15);
                 })
-                .attr("dy", 3)
-                .style("text-anchor", function (d) {
-                    return d.children ? "end" : "start";
-                })
-                .text(function (d) {
-                    return (d.depth <5 || !d.children ? d.name : "");
-                })
-                .attr("transform", function (d) {
-                    return "translate(0,-10)";
+                .style("text-anchor", "middle")
+                .text(function (d) { 
+                    return d.name;
                 });
         });
 
