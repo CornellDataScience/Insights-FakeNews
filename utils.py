@@ -5,18 +5,21 @@ UTILS FUNCTIONS TO HELP WITH VIS
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import json
+import preprocessing
 
 """
+modified from:
 http://scikit-learn.org/stable/auto_examples/tree/plot_unveil_tree_structure.html
 
 turns a tree into a dict structure for JSON dump
 
-tree_: scikit tree structure, can be extracted from random forest or decision tree models
+tree_: scikit decision tree, can be extracted from random forest or decision tree models
 feature_names: list of string names of features, in order of display in the df
 
-out: dict of int->dict, values are dicts representing a node in the tree
+out: dict as defined below
 """
-def tree_to_dict(tree_, feature_names):
+def tree_to_dict(model, feature_names):
+    tree_ = model.tree_
     n_nodes = tree_.node_count
     children_left = tree_.children_left
     children_right = tree_.children_right
@@ -47,17 +50,66 @@ def tree_to_dict(tree_, feature_names):
             "children_l": int(children_left[i]),
             "children_r": int(children_right[i]),
             "feature": feature_names[feature[i]],
-            "threshold": threshold[i]    
+            "threshold": threshold[i]
         }
-    return {'_n_nodes':int(n_nodes), "nodes": nodes}
+    return {
+        'n_nodes':int(n_nodes), 
+        "nodes": nodes, 
+        "feature_importances": list(model.feature_importances_)}
+
+"""
+modified from:
+https://planspace.org/20151129-see_sklearn_trees_with_d3/
+
+return decision tree rules in following format:
+{name: "container thing",
+ children: [{name: "leaf thing one"},
+            {name: "leaf thing two"}]}
+
+Structure of rules in a fit decision tree classifier
+
+clf : DecisionTreeClassifier
+    A tree that has already been fit.
+features: list of str
+
+
+"""
+def rules(clf, features, node_index=0):
+    node = {}
+    if clf.tree_.children_left[node_index] == -1:  # indicates leaf
+        num_labels = len(clf.tree_.value[node_index, 0])
+        labels = list(range(num_labels))
+        count_labels = zip(clf.tree_.value[node_index, 0], labels)
+        node['name'] = ', '.join(('{} of {}'.format(int(count), label)
+                                  for count, label in count_labels))
+        count_labels = zip(clf.tree_.value[node_index, 0], labels)
+        labels_data = {}
+        for count, label in count_labels:
+            labels_data[str(label)] = int(count)
+        node['leaf_labels'] = labels_data
+    else:
+        feature = features[clf.tree_.feature[node_index]]
+        threshold = clf.tree_.threshold[node_index]
+        node['name'] = '{} > {}'.format(feature, float("%3.f" % threshold))
+        node['feature'] = feature
+        node['threshold'] = threshold
+        left_index = clf.tree_.children_left[node_index]
+        right_index = clf.tree_.children_right[node_index]
+        node['children'] = [rules(clf, features, right_index),
+                            rules(clf, features, left_index)]
+    return node
 
 """
 in: trained scikit random forest model, string list of feature names
 out: list of dicts representation of trees for JSON dump
 """
 def rf_to_dict(model, feature_names):
-    trees = [x.tree_ for x in model.estimators_]
-    return {"feature_names":feature_names, "trees":[tree_to_dict(tree,feature_names) for tree in trees]}
+    trees = [clf for clf in model.estimators_]
+    return {
+        "feature_names":feature_names, 
+        "trees":[tree_to_dict(tree,feature_names) for tree in trees], 
+        "rules":[rules(tree, feature_names) for tree in trees]
+    }
 
 """
 creates json dump of RF data

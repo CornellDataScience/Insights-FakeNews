@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<!-- modified from: http://bl.ocks.org/mdml/7537455 -->
+<meta charset="utf-8">
+<style>
+    .node {
+        font: 8px sans-serif;
+    }
+</style>
+
+<body>
+    <script src="http://d3js.org/d3.v4.min.js"></script>
+    <script>
+        var width = 1700,
+            height = 850;
+
+        var tree_layout = d3.cluster()
+            .size([width - 100, height - 100])
+            .separation(function (a, b) {
+                return a.parent == b.parent ? 1 : 1;
+            });
+
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .append("g")
+            .attr("transform", "translate(" + (width - 50).toString() + ",50), rotate(90)");
+
+        var random_forest;
+
+        var colorScale = d3.scaleLinear().domain([0, 1]).range(["red", "blue"]);
+        var radiusScale = d3.scaleSqrt().domain([1,40000]).range([1,10]);
+
+        var tooltip = d3.select("body").append("div")
+            .attr("id", "tooltip")
+            .style("background", "silver")
+            .style("padding", "6px")
+            .style("opacity", 0)
+            .style("position", "absolute");
+
+        function preprocess(node) {
+            if (node.children) {
+                var child_left = preprocess(node.children[0]),
+                    child_right = preprocess(node.children[1]);
+                node.children = [child_left, child_right];
+                node.leaf_labels = {
+                    0: child_left.leaf_labels[0] + child_right.leaf_labels[0],
+                    1: child_left.leaf_labels[1] + child_right.leaf_labels[1]
+                }
+                node.label = `${node.leaf_labels[0]} of 0, ${node.leaf_labels[1]} of 1`; 
+                return node;
+            } else {
+                node.label = node.name;
+                return node;
+            }
+        }
+
+        function draw(n) {
+            var dec_tree = preprocess(random_forest["rules"][n]);
+            console.log(dec_tree);
+            var root = d3.hierarchy(dec_tree);
+            tree_layout(root);
+            var nodes = root.descendants(),
+                links = root.descendants().slice(1);
+
+            var link = svg.selectAll(".link")
+                .data(links)
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("fill", "none")
+                .attr("stroke", "silver")
+                .attr("stroke-width", "1.5px")
+                .attr("d", function (d) {
+                    return `M${d.y},${d.x}C${d.parent.y},${d.x} ${d.parent.y},${d.parent.x} ${d.parent.y},${d.parent.x}`;
+                });
+
+            var node = svg.selectAll(".node")
+                .data(nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", function (d) {
+                    return "translate(" + d.y + "," + d.x + "),rotate(-90)";
+                })
+
+            node.append("circle")
+                .attr("r", function (d) {
+                    return d.children ? 4*radiusScale(d.data.leaf_labels[1]+d.data.leaf_labels[0]) : 8;
+                })
+                .attr("fill", function (d) {
+                    return colorScale(d.data.leaf_labels[1] / (d.data.leaf_labels[0] + d.data.leaf_labels[1]));
+                })
+                .attr("stroke", "steelblue")
+                .attr("stroke-width", "1.5px")
+                .attr("class", function (d) {
+                    if (d.children) {
+                        return d.data.feature;
+                    } else {
+                        return (d.data.leaf_labels[0] < d.data.leaf_labels[1] ? "decide1" : "decide0");
+                    }
+                })
+                .on("mousemove", function (d) {
+                    //draw tooltip and line
+                    tooltip.style("opacity", 0.9)
+                        .style("left", `${d3.event.pageX + 20}px`)
+                        .style("top", `${d3.event.pageY - 20}px`)
+                        .html(d.data.label);
+                })
+                .on("mouseout", function () {
+                    //hide tooltip and line
+                    tooltip.style("opacity", 0);
+                });
+
+            node.append("text")
+                .attr("dx", 0)
+                .attr("dy", function (d) {
+                    return d.depth < 4 ? -15 : (d.parent.children[0].data.name == d.data.name ? -15 : 15);
+                })
+                .attr("fill", "grey")
+                .style("text-anchor", "middle")
+                .style("pointer-events", "none")
+                .text(function (d) {
+                    if (d.children) {
+                        var th = d.data.threshold.toString()
+                        if (th.length > 4) {
+                            th = th.slice(0, 4)
+                        }
+                        return d.data.feature + " > " + th;
+                    } else {
+                        return d.data.name;
+                    }
+                });
+        }
+
+        d3.json("test_rf_dump.json", function (error, data) {
+            random_forest = data;
+            //visualize the first tree only for now
+            draw(0);
+            //test highlighting for leaf nodes
+            // d3.selectAll(".decide1").attr("fill", "red");
+            // d3.selectAll(".decide0").attr("fill", "blue");
+        });
+
+        d3.select(self.frameElement).style("height", height + "px");
+    </script>
+</body>

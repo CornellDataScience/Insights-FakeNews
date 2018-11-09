@@ -19,10 +19,15 @@ from collections import Counter
 from scipy import spatial
 
 import spacy
+import bcolz
+import pickle
+
+"setup after spacy is installed: python -m spacy download en"
 nlp = spacy.load("en")
 
 _wnl = nltk.WordNetLemmatizer()
 analyzer = SentimentIntensityAnalyzer()
+glove_path = "word_embeddings"
 
 """
 stolen from SO: 
@@ -189,11 +194,10 @@ def shared_vocab(a, b):
 
 """
 cosine similarity of two bags of words
-in: 2 string lists
+
+in: 2 string lists - cannot be empty
 out: float
 """
-
-
 def bow_cos_similarity(a, b):
     vocab = shared_vocab(a, b)
     a_bow, b_bow = set(a), set(b)
@@ -201,7 +205,14 @@ def bow_cos_similarity(a, b):
         return -1
     a_vec = [(1 if i in a_bow else 0) for i in vocab]
     b_vec = [(1 if i in b_bow else 0) for i in vocab]
-    return spatial.distance.cosine(a_vec, b_vec)
+    return 1 - spatial.distance.cosine(a_vec, b_vec)
+
+"""
+just a cosine similarity wrapper
+pls no zero vectors
+"""
+def cosine_similarity(a,b):
+    return 1 - spatial.distance.cosine(a, b)
 
 '''
 extracts the subject, verb, and object of a sentence, 
@@ -316,15 +327,12 @@ def process_sentence(s):
     clean_s = clean(s)
     tokens = get_tokenized_lemmas(clean_s)
     clean_tokens = remove_stopwords(tokens)
+    svo = extract_SVO(" ".join(tokens))
 
     bigram = list(nltk.bigrams(clean_tokens))
     bigram_str = [x[0]+' '+x[1] for x in bigram]
-    trigram = list(nltk.trigrams(clean_tokens))
-    trigram_str = [x[0]+' '+x[1]+' '+x[2] for x in trigram]
 
     pos = nltk.pos_tag(clean_tokens)
-    # count of each tag type (dict)
-    tags_count = Counter([x[1] for x in pos])
 
     # list of words that belong to that part of speech
     nouns = [x[0] for x in pos if is_noun(x[1])]
@@ -337,13 +345,12 @@ def process_sentence(s):
     return {
         "tokens": clean_tokens,
         "bigrams": bigram_str,
-        "trigrams": trigram_str,
-        "pos_count": tags_count,
         "nouns": nouns,
         "verbs": verbs,
         "adjectives": adjectives,
         "adverbs": adverbs,
-        "sentiment": vader_sentiment
+        "sentiment": vader_sentiment,
+        "svo": list(svo)
     }
 
 
@@ -370,11 +377,9 @@ def process_body(body, idf=None):
     first_sentence = sentences[0]
     first_sentence_data = process_sentence(first_sentence)
 
-    # extracting bigrams and trigrams
+    # extracting bigrams
     bigram = list(nltk.bigrams(clean_tokens))
     bigram_str = [x[0]+' '+x[1] for x in bigram]
-    trigram = list(nltk.trigrams(clean_tokens))
-    trigram_str = [x[0]+' '+x[1]+' '+x[2] for x in trigram]
 
     pos = nltk.pos_tag(clean_tokens)
 
@@ -388,14 +393,12 @@ def process_body(body, idf=None):
     adjectives = [x[0] for x in pos if is_adjective(x[1])]
     adverbs = [x[0] for x in pos if is_adverb(x[1])]
 
-    num_nouns = len(nouns)
-    num_verbs = len(verbs)
     doc_len = len(clean_tokens)
 
     n_counter = Counter(nouns)
     v_counter = Counter(verbs)
     b_counter = Counter(bigram)
-    t_counter = Counter(trigram)
+    token_counter = Counter(clean_tokens)
 
     # common words are highest scoring IDF (or TF if IDF not available)
     # significant sentence - sentence with highest average token IDF score
@@ -403,6 +406,7 @@ def process_body(body, idf=None):
     if idf == None:
         common_nouns = [x[0] for x in n_counter.most_common(5)]
         common_verbs = [x[0] for x in v_counter.most_common(5)]
+        common_tokens = [x[0] for x in token_counter.most_common(5)]
         # this is really shitty
         sentence_importance = [(s, score_sentence(s, word_count))
                                for s in clean_sentences]
@@ -413,15 +417,19 @@ def process_body(body, idf=None):
 
     else:
         avg_idf = idf["_avg"]
-        n_tfidf, v_tfidf = {}, {}
+        n_tfidf, v_tfidf, t_tfidf = {}, {}, {}
         for n in n_counter:
             n_tfidf[n] = (n_counter[n]/doc_len) * \
                 (idf[n] if n in idf else avg_idf)
         for v in v_counter:
             v_tfidf[v] = (v_counter[v]/doc_len) * \
                 (idf[v] if v in idf else avg_idf)
+        for t in token_counter:
+            t_tfidf[t] = (token_counter[t]/doc_len) * \
+                (idf[t] if t in idf else avg_idf)
         common_nouns = sorted(n_tfidf, key=n_tfidf.get, reverse=True)[:5]
         common_verbs = sorted(v_tfidf, key=v_tfidf.get, reverse=True)[:5]
+        common_tokens = sorted(t_tfidf, key=t_tfidf.get, reverse=True)[:5]
 
         sentence_importance = [
             (s, score_sentence(s, word_count, idf)) for s in clean_sentences]
@@ -430,9 +438,8 @@ def process_body(body, idf=None):
         most_significant_sentence_data = process_sentence(
             ' '.join(most_significant_sentence))
 
-    # no idf for bigrams/trigrams :(
-    common_bigrams = [x[0] for x in b_counter.most_common(5)]
-    common_trigrams = [x[0] for x in t_counter.most_common(5)]
+    # no idf for bigrams increase "common" count to 10
+    common_bigrams = [x[0] for x in b_counter.most_common(10)]
 
     n_adj = len(adjectives)
     n_adv = len(adverbs)
@@ -453,8 +460,6 @@ def process_body(body, idf=None):
     return {
         "tokens": clean_tokens,
         "bigrams": bigram_str,
-        "trigrams": trigram_str,
-        "pos_count": tags_count,
         "nouns": nouns,
         "verbs": verbs,
         "adjectives": adjectives,
@@ -465,10 +470,10 @@ def process_body(body, idf=None):
         "adj_types": adj_types,
         "adv_types": adv_types,
         "vocabulary": set(clean_tokens),
+        "common_tokens": common_tokens,
         "common_nouns": common_nouns,
         "common_verbs": common_verbs,
         "common_bigrams": common_bigrams,
-        "common_trigrams": common_trigrams,
     }
 
 
@@ -532,12 +537,10 @@ def get_feats(data, body_dict, idf=None):
         set(body_dict[body_id]['common_nouns'])))
     shared_common_verbs = len(set(headline_data['verbs']).intersection(
         set(body_dict[body_id]['common_verbs'])))
-    shared_tokens = len(set(headline_data['tokens']).intersection(
+    shared_common_tokens = len(set(headline_data['tokens']).intersection(
         set(body_dict[body_id]['tokens'])))
     shared_bigrams = len(set(headline_data['bigrams']).intersection(
-        set(body_dict[body_id]['common_bigrams'])))
-    shared_trigrams = len(set(headline_data['trigrams']).intersection(
-        set(body_dict[body_id]['common_trigrams'])))
+        set(body_dict[body_id]['bigrams'])))
 
     shared_nouns_first = len(set(headline_data['nouns']).intersection(
         set(body_dict[body_id]['first_sentence']['nouns'])))
@@ -545,8 +548,6 @@ def get_feats(data, body_dict, idf=None):
         set(body_dict[body_id]['first_sentence']['verbs'])))
     shared_bigrams_first = len(set(headline_data['bigrams']).intersection(
         set(body_dict[body_id]['first_sentence']['bigrams'])))
-    shared_trigrams_first = len(set(headline_data['trigrams']).intersection(
-        set(body_dict[body_id]['first_sentence']['trigrams'])))
     shared_tokens_first = len(set(headline_data['tokens']).intersection(
         set(body_dict[body_id]['first_sentence']['tokens'])))
 
@@ -556,20 +557,18 @@ def get_feats(data, body_dict, idf=None):
         set(body_dict[body_id]['significant_sentence']['verbs'])))
     shared_bigrams_sig = len(set(headline_data['bigrams']).intersection(
         set(body_dict[body_id]['significant_sentence']['bigrams'])))
-    shared_trigrams_sig = len(set(headline_data['trigrams']).intersection(
-        set(body_dict[body_id]['significant_sentence']['trigrams'])))
     shared_tokens_sig = len(set(headline_data['tokens']).intersection(
         set(body_dict[body_id]['significant_sentence']['tokens'])))
 
-    # adv and adj for stance
-    shared_adjectives_sig = len(set(headline_data['adjectives']).intersection(
-        set(body_dict[body_id]['significant_sentence']['adjectives'])))
-    shared_adverbs_sig = len(set(headline_data['adverbs']).intersection(
-        set(body_dict[body_id]['significant_sentence']['adverbs'])))
-    shared_adjectives_fst = len(set(headline_data['adjectives']).intersection(
-        set(body_dict[body_id]['first_sentence']['adjectives'])))
-    shared_adverbs_fst = len(set(headline_data['adverbs']).intersection(
-        set(body_dict[body_id]['first_sentence']['adverbs'])))
+    # #adv and adj for stance
+    # shared_adjectives_sig = len(set(headline_data['adjectives']).intersection(
+    #     set(body_dict[body_id]['significant_sentence']['adjectives'])))
+    # shared_adverbs_sig = len(set(headline_data['adverbs']).intersection(
+    #     set(body_dict[body_id]['significant_sentence']['adverbs'])))
+    # shared_adjectives_fst = len(set(headline_data['adjectives']).intersection(
+    #     set(body_dict[body_id]['first_sentence']['adjectives'])))
+    # shared_adverbs_fst = len(set(headline_data['adverbs']).intersection(
+    #     set(body_dict[body_id]['first_sentence']['adverbs'])))
 
     #difference in sentiment
     sentiment_diff = {
@@ -591,13 +590,15 @@ def get_feats(data, body_dict, idf=None):
         "compound": headline_data['sentiment']['compound']-body_dict[body_id]['significant_sentence']['sentiment']['compound']
     }
 
+    headline_svo = headline_data['svo']
+    body_fst_svo = body_dict[body_id]['first_sentence']['svo']
+    body_sig_svo = body_dict[body_id]['significant_sentence']['svo']
+
     # cosine similarity - no verbs because relatively few per sentence
     cos_nouns_first = bow_cos_similarity(
         headline_data['nouns'], body_dict[body_id]['first_sentence']['nouns'])
     cos_bigrams_first = bow_cos_similarity(
         headline_data['bigrams'], body_dict[body_id]['first_sentence']['bigrams'])
-    cos_trigrams_first = bow_cos_similarity(
-        headline_data['trigrams'], body_dict[body_id]['first_sentence']['trigrams'])
     cos_tokens_first = bow_cos_similarity(
         headline_data['tokens'], body_dict[body_id]['first_sentence']['tokens'])
 
@@ -605,8 +606,6 @@ def get_feats(data, body_dict, idf=None):
         headline_data['nouns'], body_dict[body_id]['significant_sentence']['nouns'])
     cos_bigrams_sig = bow_cos_similarity(
         headline_data['bigrams'], body_dict[body_id]['significant_sentence']['bigrams'])
-    cos_trigrams_sig = bow_cos_similarity(
-        headline_data['trigrams'], body_dict[body_id]['significant_sentence']['trigrams'])
     cos_tokens_sig = bow_cos_similarity(
         headline_data['tokens'], body_dict[body_id]['significant_sentence']['tokens'])
 
@@ -614,30 +613,33 @@ def get_feats(data, body_dict, idf=None):
         'shared_nouns': shared_common_nouns,
         'shared_verbs': shared_common_verbs,
         'shared_bigrams': shared_bigrams,
-        'shared_trigrams': shared_trigrams,
-        'shared_tokens': shared_tokens,
+        'shared_tokens': shared_common_tokens,
 
         'shared_nouns_fst': shared_nouns_first,
         'shared_verbs_fst': shared_verbs_first,
         'shared_bigrams_fst': shared_bigrams_first,
-        'shared_trigrams_fst': shared_trigrams_first,
         'shared_tokens_fst': shared_tokens_first,
 
         'shared_nouns_sig': shared_nouns_sig,
         'shared_verbs_sig': shared_verbs_sig,
         'shared_bigrams_sig': shared_bigrams_sig,
-        'shared_trigrams_sig': shared_trigrams_sig,
         'shared_tokens_sig': shared_tokens_sig,
 
         'cos_nouns_sig': cos_nouns_sig,
         'cos_bigrams_sig': cos_bigrams_sig,
-        'cos_trigrams_sig': cos_trigrams_sig,
         'cos_tokens_sig': cos_tokens_sig,
 
         'cos_nouns_fst': cos_nouns_first,
         'cos_bigrams_fst': cos_bigrams_first,
-        'cos_trigrams_fst': cos_trigrams_first,
         'cos_tokens_fst': cos_tokens_first,
+
+        'svo_s_fst' : int(headline_svo[0] == body_fst_svo[0]),
+        'svo_v_fst' : int(headline_svo[1] == body_fst_svo[1]),
+        'svo_o_fst' : int(headline_svo[2] == body_fst_svo[2]),
+
+        'svo_s_sig' : int(headline_svo[0] == body_sig_svo[0]),
+        'svo_v_sig' : int(headline_svo[1] == body_sig_svo[1]),
+        'svo_o_sig' : int(headline_svo[2] == body_sig_svo[2]),
 
         'sentiment_pos': sentiment_diff['pos'],
         'sentiment_neg': sentiment_diff['neg'],
@@ -654,4 +656,55 @@ def get_feats(data, body_dict, idf=None):
         'sentiment_neu_sig': sentiment_diff_sig['neu'],
         'sentiment_compound_sig': sentiment_diff_sig['compound']
     }
+
+"""
+modified from: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
+
+input should just be the filename with no extensions or directory
+dumps some compressed files into the disk for easier loading/lookup of word embeddings later
+
+usage example: preprocessing.extract_word_embeddings("glove.6B.50d")
+"""
+def extract_word_embeddings(filename):
+    words = []
+    idx = 0
+    word2idx = {}
+    dims = None
+    vectors = bcolz.carray(np.zeros(1), rootdir=f'{glove_path}/{filename}.dat', mode='w')
+
+    with open(f'{glove_path}/{filename}.txt', 'rb') as f:
+        for l in f:
+            line = l.decode().split()
+            word = line[0]
+            words.append(word)
+            word2idx[word] = idx
+            idx += 1
+            vect = np.array(line[1:]).astype(np.float)
+            if idx == 1:
+                dims = len(vect)
+            vectors.append(vect)
+    vectors = bcolz.carray(vectors[1:].reshape((idx, dims)), rootdir=f'{glove_path}/{filename}.dat', mode='w')
+    vectors.flush()
+    pickle.dump(words, open(f'{glove_path}/{filename}_words.pkl', 'wb'))
+    pickle.dump(word2idx, open(f'{glove_path}/{filename}_idx.pkl', 'wb'))
+
+"""
+taken from: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
+
+in: filename of preprocessed glove embeddings (ex: glove.6B.50d), must run extract_word_embeddings first
+out: dict that u can use to look up vectors for words
+
+loading example:
+glove = preprocessing.get_glove_dict("glove.6B.50d")
+
+lookup example:
+glove["the"]
+"""
+def get_glove_dict(name):
+    vectors = bcolz.open(f'{glove_path}/{name}.dat')[:]
+    words = pickle.load(open(f'{glove_path}/{name}_words.pkl', 'rb'))
+    word2idx = pickle.load(open(f'{glove_path}/{name}_idx.pkl', 'rb'))
+
+    glove = {w: vectors[word2idx[w]] for w in words}
+    return glove
 
