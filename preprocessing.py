@@ -1,3 +1,18 @@
+import helpers
+import word_embeddings
+import feature_engineering
+import pickle
+import queue
+import spacy
+from scipy import spatial
+from collections import Counter
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from sklearn import feature_extraction
+import numpy as np
+from nltk import tokenize
+import nltk
+import re
 """
 FUNCTIONS FOR PREPROCESSING AND FEATURE ENGINEERING - pending reorganization
 """
@@ -6,19 +21,6 @@ FUNCTIONS FOR PREPROCESSING AND FEATURE ENGINEERING - pending reorganization
 """
 Helpers borrowed from baseline implementation in feature_engineering.py
 """
-
-import re
-import nltk
-from nltk import tokenize
-import numpy as np
-from sklearn import feature_extraction
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from collections import Counter
-
-import spacy
-import feature_engineering, word_embeddings, helpers
 
 
 """
@@ -234,7 +236,9 @@ idf - dictionary of idf scores
 
 NOTE: THIS IS VERY SLOW
 """
-def get_feats(data, body_dict, idf = None):
+
+
+def get_feats(data, body_dict, idf=None):
     return feature_engineering.get_feats(data, body_dict, idf)
 
 
