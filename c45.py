@@ -1,7 +1,7 @@
 """
 C4.5 Binary Decision Tree Implementation
 
-Usage: 
+Usage:
 Read csv file in; will be stored as a 2 Dimensional list. (See fread())
 Train a classifier (i.e. train(list))
 Prune the decision tree (i.e. prune_tree(tree, 0.5))
@@ -29,7 +29,7 @@ def n_distinct_dict(rows):
     counts = dict()
     for x in rows:
         xs = x[-1]
-        if xs not in counts: 
+        if xs not in counts:
             #Add it to the counts dictionary
             counts[xs] = 0
         counts[xs] += 1
@@ -43,7 +43,7 @@ def entropy(X):
     log_2 = lambda x: log(x)/log(2)
     #Declare entropy value
     entropy = 0.0
-    
+
     for c in counts:
         #Calculate P(C_i)
         p = float(counts[c])/len(X)
@@ -57,9 +57,9 @@ def gini(X):
     total = len(X)
     counts = n_distinct_dict(X)
     imp = 0.0
-    
+
     for k1 in counts:
-        p1 = float(counts[k1])/total  
+        p1 = float(counts[k1])/total
         for k2 in counts:
             if k1 == k2: continue
             p2 = float(counts[k2])/total
@@ -84,16 +84,16 @@ def prune_tree(tree, least_gain, eval_fun = entropy):
     eval_fun : entropy(X) or gini(X)
     least_gain : float
     """
-    
+
     if tree.right_branch.results == None: #if the right branch is a node
         prune_tree(tree.right_branch, least_gain, eval_fun)
     if tree.left_branch.results == None: #if the left branch is a node
         prune_tree(tree.left_branch, least_gain, eval_fun)
     if (tree.right_branch.results != None) and (tree.left_branch.results != None):
         right, left = [], []
-        for v, c in tree.right_branch.results.items(): 
+        for v, c in tree.right_branch.results.items():
             right += [[v]] * c
-        for v, c in tree.left_branch.results.items(): 
+        for v, c in tree.left_branch.results.items():
             left += [[v]] * c
         p = float(len(right)) / len(left + right)
         diff_entropy = eval_fun(right+left) - p*eval_fun(right) - (1-p)*eval_fun(left)
@@ -106,17 +106,17 @@ Helper functions: type_conversion, fread
 """
 def type_conversion(val):
         val = val.strip()
-        
+
         try:
             if '.' in val:
                 return float(val)
             else:
                 return int(val)
-            
+
         except ValueError:
             #For other types, return
             return val
-        
+
 def fread(f, col_labels = False):
     """
     takes a filepath, f, and a boolean argument, col_labels.
@@ -136,10 +136,10 @@ def partition(r, c, val):
     """
     #Declare anonymous function
     split_fun = None
-    if isinstance(val, float) or isinstance(val, int): 
+    if isinstance(val, float) or isinstance(val, int):
         #Anonymous function for numeric values
         split_fun = lambda row : row[c] >= val
-    else: 
+    else:
         #For string values
         split_fun = lambda row : row[c] == val
     list1 = [row for row in r if split_fun(row)]
@@ -150,20 +150,20 @@ def partition(r, c, val):
 
 def train(lst, criteria = entropy):
     """
-    Decision tree construction - by default, the entropy function is used to calculate the criteria for splitting. 
+    Decision tree construction - by default, the entropy function is used to calculate the criteria for splitting.
     lst : dataframe with the last column reserved for labels
     criteria : entropy or gini calculation function
     """
     #Base Case: Empty Set
-    if len(lst) == 0: 
+    if len(lst) == 0:
         return Tree()
-    
+
     #Calculate Entropy/Gini of current X, declare A_best, create sets/gain accordingly
     score = criteria(lst)
     Attribute_best = None
     Set_best = None
     Gain_best = 0.0
-    
+
 
     num_col = len(lst[0]) - 1  # last column of lst is labels
     for c in range(num_col):
@@ -184,7 +184,7 @@ def train(lst, criteria = entropy):
         right_branch = train(Set_best[0])
         left_branch = train(Set_best[1])
         return Tree(col=Attribute_best[0], value=Attribute_best[1], right_branch=right_branch, left_branch=left_branch)
-    
+
     else:
         return Tree(results=n_distinct_dict(lst))
 
@@ -204,7 +204,7 @@ def tree_classify(X, tree):
                 branch = tree.right_branch
             else:
                 branch = tree.left_branch
-            
+
         else:
             #Traversing decision tree for non-numeric types
             if val == tree.value:
@@ -215,3 +215,32 @@ def tree_classify(X, tree):
 
 def predict(x, classifier):
     return list(tree_classify(x, classifier))[0]
+
+
+class DecisionTree():
+	"""
+	Decision Tree Class
+	"""
+    def __init__(self, criterion = entropy, max_depth = None): 
+        self.classifier = None
+        self.criterion = criterion
+        #self.fitted = False
+    
+    def fit(self, X):
+        """
+        X is the set of data where the last column of data is labels.
+        """
+        self.classifier = train(X, self.criterion)
+        #self.fitted = True
+        
+        def prune(self):
+            prune_tree(self.classifier, 0.5, self.criterion)
+            
+        prune(self)
+        
+    def classify(self, x):
+        """
+        x is the set of values to be classified.
+        """
+        return predict(x, self.classifier)
+        
