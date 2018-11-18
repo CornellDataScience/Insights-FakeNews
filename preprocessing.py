@@ -1,3 +1,16 @@
+import pickle
+import bcolz
+import queue
+import spacy
+from scipy import spatial
+from collections import Counter
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from sklearn import feature_extraction
+import numpy as np
+from nltk import tokenize
+import nltk
+import re
 """
 FUNCTIONS FOR PREPROCESSING AND FEATURE ENGINEERING - pending reorganization
 """
@@ -7,20 +20,6 @@ FUNCTIONS FOR PREPROCESSING AND FEATURE ENGINEERING - pending reorganization
 Helpers borrowed from baseline implementation in feature_engineering.py
 """
 
-import re
-import nltk
-from nltk import tokenize
-import numpy as np
-from sklearn import feature_extraction
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from collections import Counter
-from scipy import spatial
-
-import spacy
-import bcolz
-import pickle
 
 "setup after spacy is installed: python -m spacy download en"
 nlp = spacy.load("en")
@@ -198,6 +197,8 @@ cosine similarity of two bags of words
 in: 2 string lists - cannot be empty
 out: float
 """
+
+
 def bow_cos_similarity(a, b):
     vocab = shared_vocab(a, b)
     a_bow, b_bow = set(a), set(b)
@@ -207,12 +208,16 @@ def bow_cos_similarity(a, b):
     b_vec = [(1 if i in b_bow else 0) for i in vocab]
     return 1 - spatial.distance.cosine(a_vec, b_vec)
 
+
 """
 just a cosine similarity wrapper
 pls no zero vectors
 """
-def cosine_similarity(a,b):
+
+
+def cosine_similarity(a, b):
     return 1 - spatial.distance.cosine(a, b)
+
 
 '''
 extracts the subject, verb, and object of a sentence, 
@@ -220,6 +225,8 @@ including news headlines and body text
 in: string (sentence)
 out: triple of (subj, verb, obj)
 '''
+
+
 def extract_SVO(sent):
     subj = ""
     verb = ""
@@ -227,32 +234,139 @@ def extract_SVO(sent):
     subjFound = False
     verbFound = False
     objFound = False
-    
+
     tokenized_sent = nlp(sent)
 
     for token in tokenized_sent:
         if (token.dep_ == "nsubj" and subjFound == False):
             subj = token.text
             subjFound = True
-        
+
         if (token.pos_ == "VERB" and verbFound == False):
             verb = token.text
             verbFound = True
         elif (token.head.pos_ == "VERB" and verbFound == False):
             verb = token.head.text
             verbFound = True
-        
+
         if (token.dep_ == "dobj" or token.dep_ == "pobj" and objFound == False):
             obj = token.text
             objFound = True
-        
+
     return (subj, verb, obj)
+
 
 """
 helper function for IDF's
 in: 2d list of strings
 out: dict of string -> idf score (float)
 """
+
+'''root distance feature link to paper:
+http://aclweb.org/anthology/N/N16/N16-1138.pdf
+
+returns the average root distance among all three tokens in a trigram.
+If the trigram had a negative score of 0, simply return 1.0
+'''
+
+
+def find_avg_root_dist(sent):
+    tokenized_sent = nlp(sent)
+    num_toks = len(tokenized_sent)
+    root = find_root(tokenized_sent)
+
+    trigram_tok_lst = list(
+        zip(tokenized_sent, tokenized_sent[1:], tokenized_sent[2:]))
+
+    max_neg, trigram = find_most_neg_trigram(trigram_tok_lst)
+
+    if (max_neg == 0):
+        return (1.0, trigram)
+
+    dist = 0.0
+
+    for token in trigram:
+        dist_to_tok = calc_root_dist(root, token, num_toks)
+        dist = dist + dist_to_tok
+
+    avg_dist = dist / len(trigram)
+
+    return (avg_dist, trigram)
+
+
+'''
+calculates the root distance. In other words,
+this method performs a BFS from the root to the
+token node and returns the distance divided by the number 
+of tokens in order to keep all the values between 0 and 1
+'''
+
+
+def calc_root_dist(root, token, num_toks):
+    if (root == None):
+        return 1.0
+
+    dist = 0.0
+    q = queue.Queue(maxsize=0)
+    visited = set()
+
+    q.put(root)
+    visited.add(root)
+
+    while (not(q.empty())):
+        curr_tok = q.get()
+
+        dist = dist + 1.0
+
+        for tok in curr_tok.children:
+            if (not(tok in visited)):
+
+                if (tok == token):
+                    return dist / num_toks
+
+                q.put(tok)
+                visited.add(tok)
+
+    return dist / num_toks
+
+
+'''
+retrieves the root of a tokenized sentence
+'''
+
+
+def find_root(tokenized_sent):
+    for tok in tokenized_sent:
+        if (tok.dep_ == "ROOT"):
+            return tok
+    return None
+
+
+''' 
+given a trigram list, 
+find the trigram that results in the most negativity
+returns the max_negative value, along with the trigram itself
+'''
+
+
+def find_most_neg_trigram(trigram_lst):
+    max_neg = 0.0
+    most_neg_trigram = trigram_lst[0]
+
+    for trigram in trigram_lst:
+        phrase = ""
+
+        for tok in trigram:
+            phrase = phrase + " " + tok.text
+
+        polarity_scores = analyzer.polarity_scores(phrase)
+        neg_val = polarity_scores["neg"]
+
+        if (neg_val > max_neg):
+            max_neg = neg_val
+            most_neg_trigram = trigram
+
+    return max_neg, most_neg_trigram
 
 
 def build_idf_tokens(corpus, pos_tags=None):
@@ -633,13 +747,13 @@ def get_feats(data, body_dict, idf=None):
         'cos_bigrams_fst': cos_bigrams_first,
         'cos_tokens_fst': cos_tokens_first,
 
-        'svo_s_fst' : int(headline_svo[0] == body_fst_svo[0]),
-        'svo_v_fst' : int(headline_svo[1] == body_fst_svo[1]),
-        'svo_o_fst' : int(headline_svo[2] == body_fst_svo[2]),
+        'svo_s_fst': int(headline_svo[0] == body_fst_svo[0]),
+        'svo_v_fst': int(headline_svo[1] == body_fst_svo[1]),
+        'svo_o_fst': int(headline_svo[2] == body_fst_svo[2]),
 
-        'svo_s_sig' : int(headline_svo[0] == body_sig_svo[0]),
-        'svo_v_sig' : int(headline_svo[1] == body_sig_svo[1]),
-        'svo_o_sig' : int(headline_svo[2] == body_sig_svo[2]),
+        'svo_s_sig': int(headline_svo[0] == body_sig_svo[0]),
+        'svo_v_sig': int(headline_svo[1] == body_sig_svo[1]),
+        'svo_o_sig': int(headline_svo[2] == body_sig_svo[2]),
 
         'sentiment_pos': sentiment_diff['pos'],
         'sentiment_neg': sentiment_diff['neg'],
@@ -657,6 +771,7 @@ def get_feats(data, body_dict, idf=None):
         'sentiment_compound_sig': sentiment_diff_sig['compound']
     }
 
+
 """
 modified from: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
 
@@ -665,12 +780,15 @@ dumps some compressed files into the disk for easier loading/lookup of word embe
 
 usage example: preprocessing.extract_word_embeddings("glove.6B.50d")
 """
+
+
 def extract_word_embeddings(filename):
     words = []
     idx = 0
     word2idx = {}
     dims = None
-    vectors = bcolz.carray(np.zeros(1), rootdir=f'{glove_path}/{filename}.dat', mode='w')
+    vectors = bcolz.carray(
+        np.zeros(1), rootdir=f'{glove_path}/{filename}.dat', mode='w')
 
     with open(f'{glove_path}/{filename}.txt', 'rb') as f:
         for l in f:
@@ -683,10 +801,12 @@ def extract_word_embeddings(filename):
             if idx == 1:
                 dims = len(vect)
             vectors.append(vect)
-    vectors = bcolz.carray(vectors[1:].reshape((idx, dims)), rootdir=f'{glove_path}/{filename}.dat', mode='w')
+    vectors = bcolz.carray(vectors[1:].reshape(
+        (idx, dims)), rootdir=f'{glove_path}/{filename}.dat', mode='w')
     vectors.flush()
     pickle.dump(words, open(f'{glove_path}/{filename}_words.pkl', 'wb'))
     pickle.dump(word2idx, open(f'{glove_path}/{filename}_idx.pkl', 'wb'))
+
 
 """
 taken from: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
@@ -700,6 +820,8 @@ glove = preprocessing.get_glove_dict("glove.6B.50d")
 lookup example:
 glove["the"]
 """
+
+
 def get_glove_dict(name):
     vectors = bcolz.open(f'{glove_path}/{name}.dat')[:]
     words = pickle.load(open(f'{glove_path}/{name}_words.pkl', 'rb'))
@@ -707,4 +829,3 @@ def get_glove_dict(name):
 
     glove = {w: vectors[word2idx[w]] for w in words}
     return glove
-
