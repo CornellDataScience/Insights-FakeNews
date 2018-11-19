@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <style>
     .node {
-        font: 8px sans-serif;
+        font: 14px Arial;
     }
 
     @keyframes pulse {
@@ -12,7 +12,7 @@
         }
 
         50% {
-            stroke-width: 8px;
+            stroke-width: 10px;
         }
 
         100% {
@@ -21,25 +21,52 @@
     }
 
     .pulse {
-        stroke: cyan;
+        stroke: yellow;
         animation: pulse 0.5s linear infinite;
     }
 
     div {
-        background-color: black;
+        background-color: grey;
         color: white;
+        font-family: Arial;
+        padding: 25px;
+        font: 18px;
+    }
+
+    span {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    button {
+        border-radius: 5px;
+        padding: 5px;
+        margin-top: 5px;
+    }
+
+    circle {
+        cursor: help
+    }
+
+    .decide1 {
+        stroke: blue;
+    }
+
+    .decide0 {
+        stroke: red;
     }
 </style>
 
 <body>
     <div>
-        <p>SELECT TREE TO DISPLAY</p>
-        <select id='tree_select'></select>
-        <p>SELECT FEATURES TO HIGHLIGHT</p>
+        <span>Select Tree</span>
+        <select id='tree_select'></select><span id='results'></span>
+        <br><br>
+        <span>Highlight Feature Nodes</span>
         <select id='feature_select'></select>
-        <button id='classify'>CLASSIFY</button>
+        <br>
     </div>
-    <div>
+    <div id=''>
         <svg id='main_vis'></svg>
     </div>
 
@@ -50,7 +77,7 @@
             document.body.clientWidth;
         height = (window.innerHeight ||
             document.documentElement.clientHeight ||
-            document.body.clientHeight)-150;
+            document.body.clientHeight);
 
         var tree_layout = d3.cluster()
             .size([width - 100, height - 100])
@@ -62,13 +89,12 @@
             .attr("width", width)
             .attr("height", height)
             .append("g")
-            .attr("transform", "translate(" + (width - 50).toString() + ",50), rotate(90)");
+            .attr("transform", "translate(" + (width - 50).toString() + ",75), rotate(90)");
 
-        var random_forest, nodes, links, val_data;
+        var random_forest, nodes, links, val_data, tree_data, val_classes;
 
         var tree_select = d3.select("#tree_select");
         var feature_select = d3.select("#feature_select");
-        var classify_btn = d3.select("#classify");
 
         var colorScale = d3.scaleLinear().domain([0, 1]).range(["crimson", "mediumblue"]);
         var radiusScale = d3.scaleSqrt().domain([1, 40000]).range([1, 10]);
@@ -99,22 +125,11 @@
             }
         }
 
-        function draw(n) {
+        function drawTree(n) {
             console.log("drawing tree " + n.toString());
-            current_tree = n;
-            var dec_tree = preprocess(random_forest["rules"][n]);
-            var root = d3.hierarchy(dec_tree);
-            tree_layout(root);
-            nodes = root.descendants();
-            links = root.descendants().slice(1);
-            nodes.forEach(function (d, i) {
-                d.data.id = i.toString();
-            });
-            console.log("nodes and links:", {
-                "tree": dec_tree,
-                "nodes": nodes,
-                "links": links
-            });
+
+            nodes = tree_data[n]["nodes"];
+            links = tree_data[n]["links"];
 
             var link = svg.selectAll(".link")
                 .data(links)
@@ -137,7 +152,7 @@
 
             node.append("circle")
                 .attr("r", function (d) {
-                    return d.children ? 4 * radiusScale(d.data.leaf_labels[1] + d.data.leaf_labels[0]) : 8;
+                    return d.children ? 5 * radiusScale(d.data.leaf_labels[1] + d.data.leaf_labels[0]) : 12;
                 })
                 .attr("fill", function (d) {
                     return colorScale(d.data.leaf_labels[1] / (d.data.leaf_labels[0] + d.data.leaf_labels[1]));
@@ -166,7 +181,7 @@
             node.append("text")
                 .attr("dx", 0)
                 .attr("dy", function (d) {
-                    return d.depth < 4 ? -15 : (d.parent.children[0].data.name == d.data.name ? -15 : 15);
+                    return d.depth < 4 ? -20 : (d.parent.children[0].data.name == d.data.name ? -20 : 25);
                 })
                 .attr("fill", function (d) {
                     if (d.children) {
@@ -185,71 +200,115 @@
                         }
                         return d.data.feature + " > " + th;
                     } else {
-                        return d.data.name;
+                        return "";
+                        //return d.data.name;
                     }
-                });
+                })
+                .on("mousemove", function (d) {
+                    //draw tooltip and line
+                    tooltip.style("opacity", 0.9)
+                        .style("left", `${d3.event.pageX + 20}px`)
+                        .style("top", `${d3.event.pageY - 20}px`)
+                        .html(d.data.label);
+                })
+                .on("mouseout", function () {
+                    //hide tooltip and line
+                    tooltip.style("opacity", 0);
+                });;
             link.exit().remove();
             node.exit().remove();
+
+            //update classification scores and pulsing nodes
+            display_classifications(n);
+            feature_highlight();
         }
+
+
         d3.queue()
             .defer(d3.csv, "test_val_dump.csv")
             .defer(d3.json, "test_rf_dump.json")
-            .await(function (error, data, tree) {
-                random_forest = tree;
+            .await(function (error, data, trees) {
+                random_forest = trees;
                 val_data = data;
+
                 console.log({
                     "forest": random_forest,
                     "data": data
                 });
-                //visualize the first tree only for now
-                draw(0);
-                //test highlighting for leaf nodes
-                d3.selectAll(".decide1").attr("stroke", "blue");
-                d3.selectAll(".decide0").attr("stroke", "red");
+
+                tree_data = random_forest["rules"].map(function (r) {
+                    var dec_tree = preprocess(r);
+                    var root = d3.hierarchy(dec_tree);
+                    tree_layout(root);
+                    nodes = root.descendants();
+                    links = root.descendants().slice(1);
+                    nodes.forEach(function (d, i) {
+                        d.data.id = i.toString();
+                    });
+                    return {
+                        "nodes": nodes,
+                        "links": links
+                    };
+                });
+
+                val_classes = tree_data.map(function(t){
+                    return get_classifications(t.nodes);
+                });
 
                 //set up selection
                 tree_select.on('change', function () {
                     svg.selectAll("*").remove();
-                    draw(Number(tree_select.property('value')));
+                    drawTree(Number(tree_select.property('value')));
                 });
-                feature_select.on('change', function () {
-                    var feat = feature_select.property('value');
-                    d3.selectAll(".dec_node").classed("pulse", false);
-                    d3.selectAll("." + feat).classed("pulse", true);
-                });
+
+                feature_select.on('change', feature_highlight);
+
                 tree_options = tree_select.selectAll("option").data(Array.from(Array(random_forest.trees.length).keys()))
                     .enter().append('option').text(function (d) {
                         return d;
                     });
-                feature_options = feature_select.selectAll("option").data(random_forest.feature_names)
+                
+                var ft_names = random_forest.feature_names;
+                ft_names.unshift("None");
+
+                feature_options = feature_select.selectAll("option").data(ft_names)
                     .enter().append('option').text(function (d) {
                         return d;
                     });
-                classify_btn.on('click', function () {
-                    get_classifications();
-                    //TODO display classifications
-                });
+
+                //visualize the first tree only for now
+                drawTree(0);
 
             });
 
-        function get_classifications() {
-            var classifications = [];
-            val_data.forEach(function (d) {
-                classifications.push(classify(d, Number(d['label'])));
+            function feature_highlight() {
+                var feat = feature_select.property('value');
+                d3.selectAll(".dec_node").classed("pulse", false);
+                if (feat !== "None"){
+                    d3.selectAll("." + feat).classed("pulse", true);
+                }
+            }
+
+        function display_classifications(n) {
+            d3.select("#results").text(`Validation Accuracy: ${val_classes[n].score}`);
+        }
+
+        function get_classifications(nodes) {
+            var classifications = val_data.map(function (d) {
+                return classify(d, Number(d['label']), nodes);
             });
             var score = classifications.filter(function (d) {
                 return d.label === d.pred;
             }).length / classifications.length;
-            var result = {
+            return {
                 "classes": classifications,
                 "score": score
             };
-            console.log("classification results", result);
-            return result;
+            //console.log("classification results", result);
         }
 
         //return classification, actual label, path
-        function classify(x, y) {
+        function classify(x, y, nodes) {
             //console.log(x);
             var class_data = traverse(x, nodes, 0, []);
             class_data["label"] = y;
