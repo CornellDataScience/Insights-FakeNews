@@ -182,7 +182,6 @@ def tree_classify(X, tree):
     if tree.results != None:
         return (tree.results)
     else:
-        b = None
         val = X[tree.col]  # Retrieve label from dataframe X
         if isinstance(val, float) or isinstance(val, int):
             # Traversing decision tree for numerics
@@ -203,6 +202,21 @@ def tree_classify(X, tree):
 def predict(x, classifier):
     return tree_classify(x, classifier).most_common(1)[0][0]
 
+
+
+"""
+usage:
+
+tree = DecisionTree()
+tree.train(data)
+tree.classify(input)
+
+params: 
+criterion
+max_depth - default 100
+min_samples_leaf - default 1
+min_samples_split - default 2
+"""
 
 class DecisionTree():
     """
