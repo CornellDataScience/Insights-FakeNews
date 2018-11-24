@@ -113,6 +113,105 @@ class FeatureEngineering():
 
         return (subj, verb, obj)
 
+    '''root distance feature link to paper:
+    http://aclweb.org/anthology/N/N16/N16-1138.pdf
+
+    returns the average root distance among all three tokens in a trigram.
+    If the trigram had a negative score of 0, simply return 1.0
+    '''
+
+    def find_avg_root_dist(self, sent):
+        tokenized_sent = self.nlp(sent)
+        num_toks = len(tokenized_sent)
+        root = self.find_root(tokenized_sent)
+
+        trigram_tok_lst = list(
+            zip(tokenized_sent, tokenized_sent[1:], tokenized_sent[2:]))
+
+        max_neg, trigram = self.find_most_neg_trigram(trigram_tok_lst)
+
+        if (max_neg == 0):
+            return (1.0, trigram)
+
+        dist = 0.0
+
+        for token in trigram:
+            dist_to_tok = self.calc_root_dist(root, token, num_toks)
+            dist = dist + dist_to_tok
+
+        avg_dist = dist / len(trigram)
+
+        return (avg_dist, trigram)
+
+    '''
+    calculates the root distance. In other words,
+    this method performs a BFS from the root to the
+    token node and returns the distance divided by the number 
+    of tokens in order to keep all the values between 0 and 1
+    '''
+
+    def calc_root_dist(self, root, token, num_toks):
+        if (root == None):
+            return 1.0
+
+        dist = 0.0
+        q = queue.Queue(maxsize=0)
+        visited = set()
+
+        q.put(root)
+        visited.add(root)
+
+        while (not(q.empty())):
+            curr_tok = q.get()
+
+            dist = dist + 1.0
+
+            for tok in curr_tok.children:
+                if (not(tok in visited)):
+
+                    if (tok == token):
+                        return dist / num_toks
+
+                    q.put(tok)
+                    visited.add(tok)
+
+        return dist / num_toks
+
+    '''
+    retrieves the root of a tokenized sentence
+    '''
+
+    def find_root(self, tokenized_sent):
+        for tok in tokenized_sent:
+            if (tok.dep_ == "ROOT"):
+                return tok
+        return None
+
+    ''' 
+    given a trigram list, 
+    find the trigram that results in the most negativity
+    returns the max_negative value, along with the trigram itself
+    '''
+
+    def find_most_neg_trigram(self, trigram_lst):
+        max_neg = 0.0
+        most_neg_trigram = trigram_lst[0]
+
+        for trigram in trigram_lst:
+            phrase = ""
+
+            for tok in trigram:
+                phrase = phrase + " " + tok.text
+
+            polarity_scores = self.analyzer.polarity_scores(phrase)
+            neg_val = polarity_scores["neg"]
+
+            if (neg_val > max_neg):
+                max_neg = neg_val
+                most_neg_trigram = trigram
+
+        return max_neg, most_neg_trigram
+
     """
     helper function for IDF's
     in: 2d list of strings

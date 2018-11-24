@@ -1,13 +1,7 @@
-import helpers
-import word_embeddings
-import feature_engineering
-import pickle
-import queue
-import spacy
-from scipy import spatial
+from word_embeddings import WordEmbeddings
+from helpers import Helpers
+from feature_engineering import FeatureEngineering
 from collections import Counter
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from sklearn import feature_extraction
 import numpy as np
 from nltk import tokenize
@@ -22,16 +16,6 @@ FUNCTIONS FOR PREPROCESSING AND FEATURE ENGINEERING - pending reorganization
 Helpers borrowed from baseline implementation in feature_engineering.py
 """
 
-import re
-import nltk
-from nltk import tokenize
-import numpy as np
-from sklearn import feature_extraction
-
-from collections import Counter
-from feature_engineering import FeatureEngineering
-from helpers import Helpers
-from word_embeddings import WordEmbeddings
 
 class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
 
@@ -48,17 +32,14 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
     def get_headline(self, n, df):
         return (df.iloc[n])["Headline"]
 
-
     """
     in: body ID, dataframe (train_bodies)
     out: string of body text
     example: get_body(6, train_bodies)
     """
 
-
     def get_body(self, n, df):
         return df.loc[lambda x: x["Body ID"] == n, "articleBody"].item()
-
 
     """
     builds IDF from the headlines and bodies included in a stances df
@@ -69,7 +50,6 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
     out: dict of string -> idf score (float) with one special entry (_avg -> average idf score)
     """
 
-
     def build_idf(self, bodies, stances, pos_tags=None):
         corpus = [self.get_body(x, bodies) for x in set(
             stances['Body ID'])] + list(stances['Headline'])
@@ -77,7 +57,6 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
         idf = self.build_idf_tokens(tokenized_corpus, pos_tags)
         idf["_avg"] = float(sum(idf.values())) / len(idf)
         return idf
-
 
     """
     extracts metadata from article body - READ COMMENTS FOR MORE INFO!
@@ -87,7 +66,6 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
     example usage:
     process_body(get_body(6, train_bodies))
     """
-
 
     def process_body(self, body, idf=None):
         sentences = list(nltk.tokenize.sent_tokenize(body))
@@ -134,7 +112,7 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
             common_tokens = [x[0] for x in token_counter.most_common(5)]
             # this is really shitty
             sentence_importance = [(s, self.score_sentence(s, word_count))
-                                for s in clean_sentences]
+                                   for s in clean_sentences]
             most_significant_sentence, sentence_score = list(
                 sorted(sentence_importance, key=lambda x: x[1]))[-1]
             most_significant_sentence_data = self.process_sentence(
@@ -171,12 +149,12 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
         # breakdown of porportion of regular/comparative/superlative adverbs as a tuple (in that order)
         if n_adj != 0:
             adj_types = (tags_count['JJ']/n_adj,
-                        tags_count['JJR']/n_adj, tags_count['JJS']/n_adj)
+                         tags_count['JJR']/n_adj, tags_count['JJS']/n_adj)
         else:
             adj_types = (0, 0, 0)
         if n_adv != 0:
             adv_types = (tags_count['RB']/n_adv,
-                        tags_count['RBR']/n_adv, tags_count['RBS']/n_adv)
+                         tags_count['RBR']/n_adv, tags_count['RBS']/n_adv)
         else:
             adv_types = (0, 0, 0)
 
@@ -201,7 +179,6 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
             "common_bigrams": common_bigrams,
         }
 
-
     """
     in: df of bodies, idf dict (string->float) [optional]
     out: dict with k=bodyid and v=dict of bodyinfo as per process_body
@@ -209,17 +186,16 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
     NOTE: THIS IS VERY SLOW
     """
 
-
     def process_bodies(self, df, idf=None):
         body_info = {}
         ids = list(df["Body ID"])
         for i in range(len(ids)):
             if i % 100 == 0 and i != 0:
                 print("processed "+str(i))
-            body_info[ids[i]] = self.process_body(self.get_body(ids[i], df), idf)
+            body_info[ids[i]] = self.process_body(
+                self.get_body(ids[i], df), idf)
         print("done! processed " + str(len(ids)))
         return body_info
-
 
     """
     in: df of bodies, df of stances, fraction of bodies you want to be in training set
@@ -229,7 +205,6 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
 
     example usage: stances_tr, stances_val = preprocessing.train_test_split(train_bodies, train_stances)
     """
-
 
     def train_test_split(self, bodies, stances, split=0.8):
         idx = np.random.permutation(np.arange(len(bodies)))
@@ -251,5 +226,6 @@ class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
 
     NOTE: THIS IS VERY SLOW
     """
-    def get_feats(self, data, body_dict, idf = None):
+
+    def get_feats(self, data, body_dict, idf=None):
         return self.get_feats(data, body_dict, idf)
