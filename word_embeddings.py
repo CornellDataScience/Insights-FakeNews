@@ -1,4 +1,5 @@
-import bcolz, pickle
+import bcolz
+import pickle
 import numpy as np
 
 class WordEmbeddings():
