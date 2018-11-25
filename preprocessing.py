@@ -4,7 +4,7 @@ FUNCTIONS FOR PREPROCESSING AND FEATURE ENGINEERING - pending reorganization
 
 
 """
-Helpers borrowed from baseline implementation in feature_engineering.py
+Some helpers borrowed from baseline implementation in feature_engineering.py of release code
 """
 
 import re
@@ -18,7 +18,7 @@ from feature_engineering import FeatureEngineering
 from helpers import Helpers
 from word_embeddings import WordEmbeddings
 
-class Preprocessing(Helpers, FeatureEngineering, WordEmbeddings):
+class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
 
     def __init__(self):
         Helpers.__init__(self)
