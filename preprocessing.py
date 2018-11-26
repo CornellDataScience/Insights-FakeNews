@@ -215,17 +215,3 @@ class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
         stances_tr = stances.loc[stances["Body ID"].isin(bodies_tr), :]
         stances_val = stances.loc[stances["Body ID"].isin(bodies_val), :]
         return stances_tr, stances_val
-
-    """
-    return a dictionary of features
-    see usage example:
-
-    data - [headline:str, body_id:str/int]
-    body_dict - dictionary of processed bodies
-    idf - dictionary of idf scores
-
-    NOTE: THIS IS VERY SLOW
-    """
-
-    def get_feats(self, data, body_dict, idf=None):
-        return self.get_feats(data, body_dict, idf)
