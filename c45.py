@@ -287,12 +287,15 @@ class RandomForest():
     def __init__(self, **kwargs):
         self.forest = None
         self.criterion = kwargs.get('criterion', entropy)
+        self.sample_size = kwargs.get('sample_size')
+        self.n_trees = kwargs.get('n_trees', 250)
         self.max_depth = kwargs.get('max_depth', 100)
         self.min_samples_leaf = kwargs.get('min_samples_leaf', 1)
         self.min_samples_split = kwargs.get('min_samples_split', 2)
 
-    def fit(self, X, sample_size, n_trees = 250):
-        self.forest = create_forest(X, max_depth, sample_size, self.min_samples_leaf, self.min_samples_split, n_trees)
+
+    def fit(self, X):
+        self.forest = create_forest(X, self.max_depth, self.sample_size, self.min_samples_leaf, self.min_samples_split, self.n_trees)
 
     def predictions(self, X):
         if(self.forest = None):
