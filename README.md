@@ -1,6 +1,6 @@
 # Insights-FakeNews
 
-<i>Max Chen, Shalin Mehta, Danny Yang</i>
+<i>James Chen, Max Chen, Shalin Mehta, Brandon Truong, Danny Yang</i>
 
 People will <i>never</i> stop talking about the 2016 election. While we will never know the actual extent of the effect of fake news, the least we can do is try to classify articles as fake news or real, with the hope of stopping the spread of misinformation.
 
