@@ -278,3 +278,24 @@ def forest_predictions(X, forest):
     """
     pred = [bag(forest, r) for r in X]
     return(pred)
+
+
+class RandomForest():
+    """
+    Random Forest Classifier
+    """
+    def __init__(self, **kwargs):
+        self.forest = None
+        self.criterion = kwargs.get('criterion', entropy)
+        self.max_depth = kwargs.get('max_depth', 100)
+        self.min_samples_leaf = kwargs.get('min_samples_leaf', 1)
+        self.min_samples_split = kwargs.get('min_samples_split', 2)
+
+    def fit(self, X, sample_size, n_trees = 250):
+        self.forest = create_forest(X, max_depth, sample_size, self.min_samples_leaf, self.min_samples_split, n_trees)
+
+    def predictions(self, X):
+        if(self.forest = None):
+            raise Exception("Random Forest has not been fitted. Please call fit() first.")
+        else:
+            return forest_predictions(X, self.forest)
