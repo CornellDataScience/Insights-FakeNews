@@ -211,7 +211,7 @@ tree = DecisionTree()
 tree.train(data)
 tree.classify(input)
 
-params: 
+params:
 criterion
 max_depth - default 100
 min_samples_leaf - default 1
@@ -222,23 +222,59 @@ class DecisionTree():
     """
     Decision Tree Class
     """
-    def __init__(self, **kwargs): 
+    def __init__(self, **kwargs):
         self.classifier = None
         self.criterion = kwargs.get('criterion', entropy)
         self.max_depth = kwargs.get('max_depth', 100)
         self.min_samples_leaf = kwargs.get('min_samples_leaf', 1)
         self.min_samples_split = kwargs.get('min_samples_split', 2)
-    
+
     def fit(self, X):
         """
         X is the set of data where the last column of data is labels.
         """
         self.classifier = train(X, 0, self.max_depth, self.min_samples_leaf, self.min_samples_split, self.criterion)
         prune_tree(self.classifier, 0.5, self.criterion)
-        
+
     def classify(self, x):
         """
         x is the set of values to be classified.
         """
         return predict(x, self.classifier)
-        
+
+#Bagging tree prediction
+def bag(treelst, row):
+    predictions = [predict(tree, row) for tree in treelst]
+    return max(set(predictions), key=predictions.count)
+
+def subsample(X, size):
+    sample = []
+    n = round(len(X) * size)
+    while len(sample) < n:
+        index = randrange(len(X))
+        sample.append(X[index])
+    return sample
+
+def create_forest(X, max_depth, sample_size, min_samples_leaf = 1, min_samples_split = 2, n_trees = 250):
+    """
+    Create a list containing decision trees fitted to a subsample of the data.
+    max_depth : max tree depth
+    sample_size : subsample ratio
+    min_samples_leaf : minimum samples per tree leaf
+    min_samples_split : minimum samples per split
+    n_trees : number of decision trees to create
+    """
+    forest = []
+    for i in range(n_trees):
+        sample = subsample(X, sample_size)
+        dt = DecisionTree(sample, max_depth = max_depth, min_samples_leaf = min_samples_leaf, min_samples_split = min_samples_split)
+        dt.fit(sample)
+        forest.append(dt)
+    return forest
+
+def forest_predictions(X, forest):
+    """
+    List of predictions from a random forest.
+    """
+    pred = [bag(forest, r) for r in X]
+    return(pred)
