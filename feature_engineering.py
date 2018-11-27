@@ -314,9 +314,9 @@ class FeatureEngineering(Helpers):
         shared_common_verbs = len(set(headline_data['verbs']).intersection(
             set(body_dict[body_id]['common_verbs'])))
         shared_common_tokens = len(set(headline_data['tokens']).intersection(
-            set(body_dict[body_id]['tokens'])))
+            set(body_dict[body_id]['common_tokens'])))
         shared_bigrams = len(set(headline_data['bigrams']).intersection(
-            set(body_dict[body_id]['bigrams'])))
+            set(body_dict[body_id]['common_bigrams'])))
 
         shared_nouns_first = len(set(headline_data['nouns']).intersection(
             set(body_dict[body_id]['first_sentence']['nouns'])))
