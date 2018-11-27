@@ -5,13 +5,13 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from collections import Counter
 from scipy import spatial
 import spacy
+from helpers import Helpers
 import queue
-import helpers
 
-
-class FeatureEngineering():
+class FeatureEngineering(Helpers):
 
     def __init__(self):
+        Helpers.__init__(self)
         "setup after spacy is installed: python -m spacy download en"
         self.nlp = spacy.load("en")
         self.analyzer = SentimentIntensityAnalyzer()
@@ -264,9 +264,10 @@ class FeatureEngineering():
     """
 
     def process_sentence(self, s):
-        clean_body = helpers.clean(s)
-        tokens = helpers.get_tokenized_lemmas(clean_body)
-        clean_tokens = helpers.remove_stopwords(tokens)
+        # IGNORE LINT ERRORS, these methods will only be accessed in preprocessing
+        clean_body = self.clean(s)
+        tokens = self.get_tokenized_lemmas(clean_body)
+        clean_tokens = self.remove_stopwords(tokens)
         svo = self.extract_SVO(" ".join(tokens))
 
         bigram = list(nltk.bigrams(clean_tokens))
@@ -275,10 +276,10 @@ class FeatureEngineering():
         pos = nltk.pos_tag(clean_tokens)
 
         # list of words that belong to that part of speech
-        nouns = [x[0] for x in pos if helpers.is_noun(x[1])]
-        verbs = [x[0] for x in pos if helpers.is_verb(x[1])]
-        adjectives = [x[0] for x in pos if helpers.is_adjective(x[1])]
-        adverbs = [x[0] for x in pos if helpers.is_adverb(x[1])]
+        nouns = [x[0] for x in pos if self.is_noun(x[1])]
+        verbs = [x[0] for x in pos if self.is_verb(x[1])]
+        adjectives = [x[0] for x in pos if self.is_adjective(x[1])]
+        adverbs = [x[0] for x in pos if self.is_adverb(x[1])]
 
         vader_sentiment = self.get_sentiment(s)
 
@@ -313,9 +314,9 @@ class FeatureEngineering():
         shared_common_verbs = len(set(headline_data['verbs']).intersection(
             set(body_dict[body_id]['common_verbs'])))
         shared_common_tokens = len(set(headline_data['tokens']).intersection(
-            set(body_dict[body_id]['tokens'])))
+            set(body_dict[body_id]['common_tokens'])))
         shared_bigrams = len(set(headline_data['bigrams']).intersection(
-            set(body_dict[body_id]['bigrams'])))
+            set(body_dict[body_id]['common_bigrams'])))
 
         shared_nouns_first = len(set(headline_data['nouns']).intersection(
             set(body_dict[body_id]['first_sentence']['nouns'])))
