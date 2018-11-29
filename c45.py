@@ -65,7 +65,7 @@ class Tree:
     """
 
     def __init__(self, col=-1, value=None, right_branch=None, left_branch=None, results=None):
-        self.col = col
+        self.feature = col
         self.value = value
         self.right_branch = right_branch
         self.left_branch = left_branch
@@ -168,7 +168,7 @@ def train(lst, depth=0, max_depth=100, min_samples_leaf=1, min_samples_split=2, 
             # Recursive Call on partitioned Sets
             r = train(Set_best[0], depth+1, max_depth)
             l = train(Set_best[1], depth+1, max_depth)
-            return Tree(col=Attribute_best[0], value=Attribute_best[1], right_branch=r, left_branch=l)
+            return Tree(feature=Attribute_best[0], value=Attribute_best[1], right_branch=r, left_branch=l)
         else:
             return Tree(results=Counter([x[-1] for x in lst]))
     else: #partition is too small to split
@@ -182,7 +182,7 @@ def tree_classify(X, tree):
     if tree.results != None:
         return (tree.results)
     else:
-        val = X[tree.col]  # Retrieve label from dataframe X
+        val = X[tree.feature]  # Retrieve label from dataframe X
         if isinstance(val, float) or isinstance(val, int):
             # Traversing decision tree for numerics
             if val >= tree.value:
