@@ -24,6 +24,7 @@ print(predict([2,0,2,6,1,0,0,3,1,0,0,2,0,0,0,0,0,1,.223606798,0,.285714,.141421,
 from collections import OrderedDict, Counter
 from math import log
 import csv
+from random import randrange
 
 
 def entropy(X):
@@ -268,7 +269,7 @@ def create_forest(X, max_depth, sample_size, min_samples_leaf = 1, min_samples_s
     forest = []
     for i in range(n_trees):
         sample = subsample(X, sample_size)
-        dt = DecisionTree(sample, max_depth = max_depth, min_samples_leaf = min_samples_leaf, min_samples_split = min_samples_split)
+        dt = DecisionTree(max_depth = max_depth, min_samples_leaf = min_samples_leaf, min_samples_split = min_samples_split)
         dt.fit(sample)
         forest.append(dt)
     return forest
@@ -287,8 +288,8 @@ class RandomForest():
     """
     def __init__(self, **kwargs):
         self.forest = None
-        self.criterion = kwargs.get('criterion', entropy)
         self.sample_size = kwargs.get('sample_size')
+        self.criterion = kwargs.get('criterion', entropy)
         self.n_trees = kwargs.get('n_trees', 250)
         self.max_depth = kwargs.get('max_depth', 100)
         self.min_samples_leaf = kwargs.get('min_samples_leaf', 1)
