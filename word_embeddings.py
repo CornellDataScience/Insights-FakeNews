@@ -1,4 +1,4 @@
-# import bcolz
+import bcolz
 import pickle
 import numpy as np
 
