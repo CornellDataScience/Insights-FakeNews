@@ -64,12 +64,13 @@ class Tree:
     Decision Tree class
     """
 
-    def __init__(self, col=-1, value=None, right_branch=None, left_branch=None, results=None):
-        self.feature = col
+    def __init__(self, feature=-1, value=None, right_branch=None, left_branch=None, results=None, gain = 0.0):
+        self.feature = feature
         self.value = value
         self.right_branch = right_branch
         self.left_branch = left_branch
         self.results = results
+        self.gain = gain
 
 
 def prune_tree(tree, least_gain, eval_fun=entropy):
@@ -168,9 +169,9 @@ def train(lst, depth=0, max_depth=100, min_samples_leaf=1, min_samples_split=2, 
             # Recursive Call on partitioned Sets
             r = train(Set_best[0], depth+1, max_depth)
             l = train(Set_best[1], depth+1, max_depth)
-            return Tree(feature=Attribute_best[0], value=Attribute_best[1], right_branch=r, left_branch=l)
+            return Tree(feature=Attribute_best[0], value=Attribute_best[1], right_branch=r, left_branch=l, gain = Gain_best)
         else:
-            return Tree(results=Counter([x[-1] for x in lst]))
+            return Tree(results=Counter([x[-1] for x in lst]), gain = Gain_best)
     else: #partition is too small to split
         return Tree(results=Counter([x[-1] for x in lst]))
 
@@ -298,7 +299,7 @@ class RandomForest():
         self.forest = create_forest(X, self.max_depth, self.sample_size, self.min_samples_leaf, self.min_samples_split, self.n_trees)
 
     def predictions(self, X):
-        if(self.forest = None):
+        if(self.forest == None):
             raise Exception("Random Forest has not been fitted. Please call fit() first.")
         else:
             return forest_predictions(X, self.forest)
