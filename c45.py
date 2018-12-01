@@ -281,6 +281,27 @@ def forest_predictions(X, forest):
     pred = [bag(forest, r) for r in X]
     return(pred)
 
+def predict_probabilities(forest, inputs):
+    """
+    forest is a list of DecisionTree objects.
+    """
+    if(forest == None):
+        raise Exception("Random Forest has not been fitted. Please call fit() first.")
+    prob0 = 0
+    prob1 = 0
+    for i in range(len(forest)):
+        temp0 = prob0 * (i)
+        temp1 = prob1 * (i)
+        classifications = tree_classify(inputs, forest[i].classifier)
+        prob0 = (temp0 + (classifications[0] / (classifications[0] + classifications[1]))) / (i + 1)
+        prob1 = (temp1 + (classifications[1] / (classifications[0] + classifications[1]))) / (i + 1)
+    if prob0>=prob1:
+        #If 0 is at least as likely as 1, return 0 for deterministic behavior.
+        return (0, prob0)
+    else:
+        return (1, prob1)
+    #else:
+        #return (0, prob0)
 
 class RandomForest():
     """
@@ -300,7 +321,22 @@ class RandomForest():
         self.forest = create_forest(X, self.max_depth, self.sample_size, self.min_samples_leaf, self.min_samples_split, self.n_trees)
 
     def predictions(self, X):
+        """
+        predictions is the list containing the prediction of each DecisionTree in the forest.
+        """
         if(self.forest == None):
             raise Exception("Random Forest has not been fitted. Please call fit() first.")
         else:
             return forest_predictions(X, self.forest)
+
+    def predict_probs(self, X):
+        """
+        predict_probs is the (prediction, probability) tuple representing the result of the RandomForest object.
+        """
+        return predict_probabilities(self.forest, X)
+
+    def predict(self, X):
+        """
+        predict is the int (0,1) representing the label classified by the RandomForest object.
+        """
+        return predict_probabilities(self.forest, X)[0]
