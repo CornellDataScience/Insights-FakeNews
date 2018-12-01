@@ -8,6 +8,7 @@ import spacy
 from helpers import Helpers
 import queue
 
+
 class FeatureEngineering(Helpers):
 
     def __init__(self):
@@ -112,6 +113,78 @@ class FeatureEngineering(Helpers):
                 objFound = True
 
         return (subj, verb, obj)
+
+    def find_min_root_dist(self, sent):
+        tokenized_sent = list(self.nlp(sent))
+        num_toks = len(tokenized_sent)
+        root = self.find_root(tokenized_sent)
+        neg_word_lexicon = self.negating_words
+        closest_neg_word = ""
+
+        dist = len(tokenized_sent)
+
+        neg_word_tok_lst, neg_word_str_lst = self.find_neg_words_in_sent(
+            tokenized_sent, neg_word_lexicon)
+
+        if (len(neg_word_tok_lst) == 0):
+            return 1.0
+
+        closest_word_idx = 0
+
+        for token in neg_word_tok_lst:
+            dist_to_tok = self.calc_root_dist_normalized(root, token, num_toks)
+
+            if (dist_to_tok < dist):
+                dist = dist_to_tok
+                closest_neg_word = neg_word_str_lst[closest_word_idx]
+
+            closest_word_idx = closest_word_idx + 1
+
+        return (dist, closest_neg_word, neg_word_tok_lst, neg_word_str_lst)
+
+    # BFS
+    def calc_root_dist_normalized(self, root, token, num_toks):
+        if (root == None):
+            return 1.0
+
+        dist = 0.0
+        q = queue.Queue(maxsize=0)
+        visited = set()
+
+        q.put(root)
+        visited.add(root)
+
+        while (not(q.empty())):
+            curr_tok = q.get()
+
+            dist = dist + 1.0
+
+            for tok in curr_tok.children:
+                if (not(tok in visited)):
+                    if (tok == token):
+                        return dist / num_toks
+
+                    q.put(tok)
+                    visited.add(tok)
+
+        return dist / num_toks
+
+    def find_neg_words_in_sent(self, tokenized_sent, neg_word_lexicon):
+        neg_tok_lst = []
+        neg_word_lst = []
+
+        for token in tokenized_sent:
+            if (token.text.lower() in neg_word_lexicon
+                    or token.text.lower() == "n't"):
+                if (token.text.lower() == "n't"):
+                    head_word = tokenized_sent[tokenized_sent.index(token) - 1]
+                    neg_word_lst.append(head_word.text + token.text)
+                else:
+                    neg_word_lst.append(token.text)
+
+                neg_tok_lst.append(token)
+
+        return (neg_tok_lst, neg_word_lst)
 
     '''root distance feature link to paper:
     http://aclweb.org/anthology/N/N16/N16-1138.pdf
