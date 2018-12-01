@@ -303,6 +303,30 @@ def predict_probabilities(forest, inputs):
     #else:
         #return (0, prob0)
 
+"""
+The following two functions are used to evaluate a RandomForest. They have been modified from Jason Brownlee's implementation, along with the score function.
+"""
+# Split a dataset into k folds
+def cross_validation_split(dataset, n_folds):
+    dataset_split = list()
+    dataset_copy = list(dataset)
+    fold_size = int(len(dataset) / n_folds)
+    for i in range(n_folds):
+        fold = list()
+        while len(fold) < fold_size:
+            index = randrange(len(dataset_copy))
+            fold.append(dataset_copy.pop(index))
+        dataset_split.append(fold)
+    return dataset_split
+
+# Calculate accuracy percentage
+def accuracy_metric(actual, predicted):
+    correct = 0
+    for i in range(len(actual)):
+        if actual[i] == predicted[i]:
+            correct += 1
+    return correct / float(len(actual)) * 100.0
+
 class RandomForest():
     """
     Random Forest Classifier
@@ -340,3 +364,49 @@ class RandomForest():
         predict is the int (0,1) representing the label classified by the RandomForest object.
         """
         return predict_probabilities(self.forest, X)[0]
+    """
+    def score(self, data, n_folds = 5):
+        folds = cross_validation_split(data, n_folds)
+        scores = list()
+        for fold in folds:
+            train_set = list(folds)
+            train_set.remove(fold)
+            train_set = sum(train_set, [])
+            test_set = list()
+            for row in fold:
+                row_copy = list(row)
+                test_set.append(row_copy)
+                row_copy[-1] = None
+                rf = RandomForest(sample_size = self.sample_size, criterion = self.criterion, n_trees = self.n_trees, max_depth = self.max_depth, min_samples_leaf = self.min_samples_leaf, min_samples_split = self.min_samples_split)
+                rf.fit(train_set)
+                predicted = rf.predictions(test_set)
+                print(rf.predictions(test_set))
+                actual = [row[-1] for row in fold]
+                accuracy = accuracy_metric(actual, predicted)
+                scores.append(accuracy)
+            return (sum(scores)/float(len(scores)))
+    """
+# Evaluate an algorithm using a cross validation split
+def evaluate_forest(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2):
+    folds = cross_validation_split(dataset, n_folds)
+    scores = list()
+    for fold in folds:
+        train_set = list(folds)
+        train_set.remove(fold)
+        train_set = sum(train_set, [])
+        test_set = list()
+        for row in fold:
+            row_copy = list(row)
+            test_set.append(row_copy)
+            row_copy[-1] = None
+        rf = RandomForest(sample_size = sample_size, criterion = entropy, n_trees = ntrees, max_depth = maxdepth, min_samples_leaf = minsamplesleaf, min_samples_split = minsamplessplit)
+        rf.fit(train_set)
+        predicted = rf.predictions(test_set)
+        actual = [row[-1] for row in fold]
+        accuracy = accuracy_metric(actual, predicted)
+        scores.append(accuracy)
+    return scores
+
+def mean_accuracy(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2):
+    scores = evaluate_forest(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2)
+    return (sum(scores)/float(len(scores)))
