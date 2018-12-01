@@ -246,7 +246,7 @@ class DecisionTree():
 
 #Bagging tree prediction
 def bag(treelst, row):
-    predictions = [predict(tree, row) for tree in treelst]
+    predictions = [predict(row, tree.classifier) for tree in treelst]
     return max(set(predictions), key=predictions.count)
 
 def subsample(X, size):
@@ -290,7 +290,7 @@ class RandomForest():
         self.forest = None
         self.sample_size = kwargs.get('sample_size')
         self.criterion = kwargs.get('criterion', entropy)
-        self.n_trees = kwargs.get('n_trees', 250)
+        self.n_trees = kwargs.get('n_trees', 25)
         self.max_depth = kwargs.get('max_depth', 100)
         self.min_samples_leaf = kwargs.get('min_samples_leaf', 1)
         self.min_samples_split = kwargs.get('min_samples_split', 2)
