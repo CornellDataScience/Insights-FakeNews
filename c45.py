@@ -257,18 +257,18 @@ def subsample(X, size):
         sample.append(X[index])
     return sample
 
-def create_forest(X, max_depth, sample_size, min_samples_leaf = 1, min_samples_split = 2, n_trees = 250):
+def create_forest(X, max_depth, subsample_ratio, min_samples_leaf = 1, min_samples_split = 2, n_trees = 250):
     """
     Create a list containing decision trees fitted to a subsample of the data.
     max_depth : max tree depth
-    sample_size : subsample ratio
+    subsample_ratio : subsample ratio
     min_samples_leaf : minimum samples per tree leaf
     min_samples_split : minimum samples per split
     n_trees : number of decision trees to create
     """
     forest = []
     for i in range(n_trees):
-        sample = subsample(X, sample_size)
+        sample = subsample(X, subsample_ratio)
         dt = DecisionTree(max_depth = max_depth, min_samples_leaf = min_samples_leaf, min_samples_split = min_samples_split)
         dt.fit(sample)
         forest.append(dt)
@@ -333,7 +333,7 @@ class RandomForest():
     """
     def __init__(self, **kwargs):
         self.forest = None
-        self.sample_size = kwargs.get('sample_size')
+        self.subsample_ratio = kwargs.get('subsample_ratio')
         self.criterion = kwargs.get('criterion', entropy)
         self.n_trees = kwargs.get('n_trees', 25)
         self.max_depth = kwargs.get('max_depth', 100)
@@ -342,7 +342,7 @@ class RandomForest():
 
 
     def fit(self, X):
-        self.forest = create_forest(X, self.max_depth, self.sample_size, self.min_samples_leaf, self.min_samples_split, self.n_trees)
+        self.forest = create_forest(X, self.max_depth, self.subsample_ratio, self.min_samples_leaf, self.min_samples_split, self.n_trees)
 
     def predictions(self, X):
         """
@@ -377,7 +377,7 @@ class RandomForest():
                 row_copy = list(row)
                 test_set.append(row_copy)
                 row_copy[-1] = None
-                rf = RandomForest(sample_size = self.sample_size, criterion = self.criterion, n_trees = self.n_trees, max_depth = self.max_depth, min_samples_leaf = self.min_samples_leaf, min_samples_split = self.min_samples_split)
+                rf = RandomForest(subsample_ratio = self.subsample_ratio, criterion = self.criterion, n_trees = self.n_trees, max_depth = self.max_depth, min_samples_leaf = self.min_samples_leaf, min_samples_split = self.min_samples_split)
                 rf.fit(train_set)
                 predicted = rf.predictions(test_set)
                 print(rf.predictions(test_set))
@@ -387,7 +387,7 @@ class RandomForest():
             return (sum(scores)/float(len(scores)))
     """
 # Evaluate an algorithm using a cross validation split
-def evaluate_forest(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2):
+def evaluate_forest(dataset, n_folds, subsample_ratio, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2):
     folds = cross_validation_split(dataset, n_folds)
     scores = list()
     for fold in folds:
@@ -399,7 +399,7 @@ def evaluate_forest(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, 
             row_copy = list(row)
             test_set.append(row_copy)
             row_copy[-1] = None
-        rf = RandomForest(sample_size = sample_size, criterion = entropy, n_trees = ntrees, max_depth = maxdepth, min_samples_leaf = minsamplesleaf, min_samples_split = minsamplessplit)
+        rf = RandomForest(subsample_ratio = subsample_ratio, criterion = entropy, n_trees = ntrees, max_depth = maxdepth, min_samples_leaf = minsamplesleaf, min_samples_split = minsamplessplit)
         rf.fit(train_set)
         predicted = rf.predictions(test_set)
         actual = [row[-1] for row in fold]
@@ -407,6 +407,30 @@ def evaluate_forest(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, 
         scores.append(accuracy)
     return scores
 
-def mean_accuracy(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2):
-    scores = evaluate_forest(dataset, n_folds, sample_size, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2)
+def mean_accuracy(dataset, n_folds, subsample_ratio, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2):
+    scores = evaluate_forest(dataset, n_folds, subsample_ratio, ntrees = 25, maxdepth = 100, minsamplesleaf = 1, minsamplessplit = 2)
+    return (sum(scores)/float(len(scores)))
+
+def evaluate_tree(dataset, n_folds):
+    folds = cross_validation_split(dataset, n_folds)
+    scores = list()
+    for fold in folds:
+        train_set = list(folds)
+        train_set.remove(fold)
+        train_set = sum(train_set, [])
+        test_set = list()
+        for row in fold:
+            row_copy = list(row)
+            test_set.append(row_copy)
+            row_copy[-1] = None
+        dt = DecisionTree()
+        dt.fit(train_set)
+        predicted = [dt.classify(x) for x in test_set]
+        actual = [row[-1] for row in fold]
+        accuracy = accuracy_metric(actual, predicted)
+        scores.append(accuracy)
+    return scores
+
+def mean_tree_accuracy(dataset, n_folds):
+    scores = evaluate_tree(dataset, n_folds)
     return (sum(scores)/float(len(scores)))
