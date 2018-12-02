@@ -10,7 +10,7 @@ var color = d3.scale.linear()
 
 var wordScale = d3.scale.linear().range([10,200]);
 
-d3.csv('disagree_wordcounts.csv', function(data) {
+d3.csv('../disagree_wordcounts.csv', function(data) {
   var most_frequent = data
     .filter(function(d) {return +d.Frequency > 0; })
     .map(function(d) {return {text: d.Word, size: +d.Frequency};})
