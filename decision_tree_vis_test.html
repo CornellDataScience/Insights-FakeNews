@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<!-- starter code from: http://bl.ocks.org/mdml/7537455 -->
 <meta charset="utf-8">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+    crossorigin="anonymous">
 <style>
     .node {
         font: 14px Arial;
@@ -25,11 +26,31 @@
         animation: pulse 0.5s linear infinite;
     }
 
+
+    @keyframes pulse2 {
+        0% {
+            stroke-width: 1px;
+        }
+
+        50% {
+            stroke-width: 5px;
+        }
+
+        100% {
+            stroke-width: 1px;
+        }
+    }
+
+    .pulse2 {
+        stroke: yellow;
+        animation: pulse2 0.5s linear infinite;
+    }
+
     div {
         background-color: grey;
-        color: white;
+        color: black;
         font-family: Arial;
-        padding: 25px;
+        padding: 15px;
         font: 18px;
     }
 
@@ -56,17 +77,28 @@
         stroke: red;
     }
 </style>
+<!-- built off of code from: http://bl.ocks.org/mdml/7537455 -->
 
 <body>
     <div>
-        <span>Select Tree</span>
-        <select id='tree_select'></select><span id='results'></span>
-        <br><br>
-        <span>Highlight Feature Nodes</span>
-        <select id='feature_select'></select>
-        <br>
+        <div class='row'>
+            <div class='col-sm-3'>
+                <div class='card'>
+                    <span>Select Tree</span>
+                    <select id='tree_select'></select>
+                    <br>
+                    <span id='results'></span>
+                    <br>
+                    <span>Highlight Feature Nodes</span>
+                    <select id='feature_select'></select>
+                </div>
+            </div>
+            <div class='col-sm-9'>
+                <svg id='aggregate_vis' width='1300' height='150'></svg>
+            </div>
+        </div>
     </div>
-    <div id=''>
+    <div>
         <svg id='main_vis'></svg>
     </div>
 
@@ -79,28 +111,30 @@
             document.documentElement.clientHeight ||
             document.body.clientHeight);
 
-        var tree_layout = d3.cluster()
-            .size([width - 100, height - 100])
-            .separation(function (a, b) {
-                return a.parent == b.parent ? 1 : 1;
-            });
-
-        var svg = d3.select("#main_vis")
+        var svg_main = d3.select("#main_vis")
             .attr("width", width)
-            .attr("height", height)
-            .append("g")
+            .attr("height", height);
+        var svg = svg_main.append("g")
             .attr("transform", "translate(" + (width - 50).toString() + ",75), rotate(90)");
 
-        var random_forest, nodes, links, val_data, tree_data, val_classes;
+        var random_forest; // the raw json of random forest that is loaded
+        var nodes; // the nodes for the tree currently being displayed
+        var links; // the links for the tree currently being displayed
+        var val_data; // the raw data csv that is loaded
+        var tree_data; // stores the nodes and links for every tree
+        var val_classes; // the classification results of the raw data for each tree
 
+        // selection options in the menu
         var tree_select = d3.select("#tree_select");
         var feature_select = d3.select("#feature_select");
 
         var colorScale = d3.scaleLinear().domain([0, 1]).range(["crimson", "mediumblue"]);
         var radiusScale = d3.scaleSqrt().domain([1, 40000]).range([1, 10]);
+        var scoreScale;
 
         var tooltip = d3.select("body").append("div")
             .attr("id", "tooltip")
+            .style("color", 'white')
             .style("background", "gray")
             .style("padding", "6px")
             .style("opacity", 0)
@@ -108,6 +142,14 @@
 
         var current_tree = 0;
 
+        //aggregate heatmap
+        var svg_agg = d3.select('#aggregate_vis');
+        var box_w = 30;
+        var box_size = 25;
+        var ft_names;
+        var data_agg = [];
+
+        // recursive preprocessing function for trees
         function preprocess(node) {
             if (node.children) {
                 var child_left = preprocess(node.children[0]),
@@ -125,11 +167,24 @@
             }
         }
 
+        // draw tree at n-th index in tree_data
         function drawTree(n) {
             console.log("drawing tree " + n.toString());
+            var curr_tree = tree_data[n];
 
-            nodes = tree_data[n]["nodes"];
-            links = tree_data[n]["links"];
+            nodes = curr_tree["nodes"];
+            links = curr_tree["links"];
+
+            //resize svg to display new tree
+            var depth = curr_tree["depth"];
+            var w = Math.pow(width, (depth - 5)),
+                h = height * (depth - 5);
+            svg_main.attr("width", w);
+            svg_main.attr("height", h);
+
+            svg.remove();
+            svg = svg_main.append("g")
+                .attr("transform", `translate(${w-75},75), rotate(90)`);
 
             var link = svg.selectAll(".link")
                 .data(links)
@@ -150,6 +205,7 @@
                     return "translate(" + d.y + "," + d.x + "),rotate(-90)";
                 });
 
+            //draw actual node
             node.append("circle")
                 .attr("r", function (d) {
                     return d.children ? 5 * radiusScale(d.data.leaf_labels[1] + d.data.leaf_labels[0]) : 12;
@@ -166,18 +222,13 @@
                         return "leaf " + (d.data.leaf_labels[0] < d.data.leaf_labels[1] ? "decide1" : "decide0");
                     }
                 })
-                .on("mousemove", function (d) {
-                    //draw tooltip and line
-                    tooltip.style("opacity", 0.9)
-                        .style("left", `${d3.event.pageX + 20}px`)
-                        .style("top", `${d3.event.pageY - 20}px`)
-                        .html(d.data.label);
-                })
+                .on("mousemove", draw_tooltip)
                 .on("mouseout", function () {
                     //hide tooltip and line
                     tooltip.style("opacity", 0);
                 });
 
+            // draw tooltip
             node.append("text")
                 .attr("dx", 0)
                 .attr("dy", function (d) {
@@ -193,7 +244,7 @@
                 .style("text-anchor", "middle")
                 .style("pointer-events", "none")
                 .text(function (d) {
-                    if (d.children) {
+                    if (d.children && d.depth < 5) {
                         var th = d.data.threshold.toString();
                         if (th.length > 4) {
                             th = th.slice(0, 4)
@@ -204,17 +255,12 @@
                         //return d.data.name;
                     }
                 })
-                .on("mousemove", function (d) {
-                    //draw tooltip and line
-                    tooltip.style("opacity", 0.9)
-                        .style("left", `${d3.event.pageX + 20}px`)
-                        .style("top", `${d3.event.pageY - 20}px`)
-                        .html(d.data.label);
-                })
+                .on("mousemove", draw_tooltip)
                 .on("mouseout", function () {
                     //hide tooltip and line
                     tooltip.style("opacity", 0);
-                });;
+                });
+
             link.exit().remove();
             node.exit().remove();
 
@@ -223,10 +269,43 @@
             feature_highlight();
         }
 
+        //helper for drawing tooltips
+        function draw_tooltip(d) {
+            if (d.children) {
+                var th = d.data.threshold.toString();
+                if (th.length > 4) {
+                    th = th.slice(0, 4)
+                }
+                tooltip.style("opacity", 0.9)
+                    .style("left", `${d3.event.pageX + 20}px`)
+                    .style("top", `${d3.event.pageY - 20}px`)
+                    .html(`${d.data.feature} > ${th}<br>${d.data.label}`);
+            } else {
+                tooltip.style("opacity", 0.9)
+                    .style("left", `${d3.event.pageX + 20}px`)
+                    .style("top", `${d3.event.pageY - 20}px`)
+                    .html(d.data.label);
+            }
+        }
 
+        function draw_tooltip_agg(d) {
+            var feat = feature_select.property('value');
+            tooltip.style("opacity", 0.9)
+                .style("left", `${d3.event.pageX + 20}px`)
+                .style("top", `${d3.event.pageY - 20}px`)
+                .html(function () {
+                    if (feat !== 'None') {
+                        return `Tree Number: ${d.num}<br>Validation Score: ${d.score.toString().slice(0,5)}<br> # Nodes splitting on ${feat}: ${d.feature_data[feat]}`;
+                    } else {
+                        return `Tree Number: ${d.num}<br>Validation Score: ${d.score.toString().slice(0,5)}`;
+                    }
+                });
+        }
+
+        //load data and perform setup - automatically runs on page load
         d3.queue()
-            .defer(d3.csv, "test_val_dump.csv")
-            .defer(d3.json, "test_rf_dump.json")
+            .defer(d3.csv, "saved_data/test_val_dump.csv")
+            .defer(d3.json, "saved_models/test_rf_dump.json")
             .await(function (error, data, trees) {
                 random_forest = trees;
                 val_data = data;
@@ -239,6 +318,14 @@
                 tree_data = random_forest["rules"].map(function (r) {
                     var dec_tree = preprocess(r);
                     var root = d3.hierarchy(dec_tree);
+                    var depth = root.height;
+
+                    var tree_layout = d3.cluster()
+                        .size([Math.pow(width, (depth - 5)) - 100, height * (depth - 5) - 100])
+                        .separation(function (a, b) {
+                            return a.parent == b.parent ? 1 : 1;
+                        });
+
                     tree_layout(root);
                     nodes = root.descendants();
                     links = root.descendants().slice(1);
@@ -246,12 +333,13 @@
                         d.data.id = i.toString();
                     });
                     return {
+                        "depth": depth,
                         "nodes": nodes,
                         "links": links
                     };
                 });
 
-                val_classes = tree_data.map(function(t){
+                val_classes = tree_data.map(function (t) {
                     return get_classifications(t.nodes);
                 });
 
@@ -267,8 +355,8 @@
                     .enter().append('option').text(function (d) {
                         return d;
                     });
-                
-                var ft_names = random_forest.feature_names;
+
+                ft_names = random_forest.feature_names;
                 ft_names.unshift("None");
 
                 feature_options = feature_select.selectAll("option").data(ft_names)
@@ -276,23 +364,88 @@
                         return d;
                     });
 
+                for (var i = 0; i < val_classes.length; i++) {
+                    var single_tree = val_classes[i];
+                    var nodes = tree_data[i]['nodes'];
+                    var ft_data = {}
+                    ft_names.forEach(function (f) {
+                        ft_data[f] = 0;
+                    });
+                    nodes.forEach(function (n) {
+                        ft_data[n.data.feature] += 1;
+                    });
+                    single_tree['feature_data'] = ft_data;
+                    single_tree['num'] = i;
+                    data_agg.push(single_tree);
+                }
+                //sort by score
+                data_agg.sort(function(a,b){return b.score - a.score})
+                svg_agg.attr('height', (box_size + 2) * Math.ceil(data_agg.length / box_w));
+
+                scoreScale = d3.scaleLinear()
+                    .domain(d3.extent(data_agg.map(function (d) {
+                        return d.score;
+                    })))
+                    .range(["crimson", "mediumblue"]);
+
                 //visualize the first tree only for now
+                draw_heatmap();
                 drawTree(0);
 
             });
 
-            function feature_highlight() {
-                var feat = feature_select.property('value');
-                d3.selectAll(".dec_node").classed("pulse", false);
-                if (feat !== "None"){
-                    d3.selectAll("." + feat).classed("pulse", true);
-                }
-            }
-
-        function display_classifications(n) {
-            d3.select("#results").text(`Validation Accuracy: ${val_classes[n].score}`);
+        function draw_heatmap() {
+            var boxes = svg_agg.selectAll('rect').data(data_agg)
+                .enter().append('rect')
+                .attr('class', function (d) {
+                    var class_names = 'tree_grid';
+                    ft_names.forEach(function (f) {
+                        if (d.feature_data[f] > 0) {
+                            class_names = (class_names + " " + f + "heatmap");
+                        }
+                    });
+                    return class_names;
+                })
+                .attr('width', box_size).attr('height', box_size)
+                .attr('x', function (d, i) {
+                    return (i % box_w) * (box_size + 2);
+                })
+                .attr('y', function (d, i) {
+                    return Math.floor(i / box_w) * (box_size + 2);
+                })
+                .attr('fill', function (d) {
+                    return scoreScale(d.score);
+                })
+                .on('click', function (d, i) {
+                    svg.selectAll("*").remove();
+                    drawTree(Number(i));
+                })
+                .on("mousemove", draw_tooltip_agg)
+                .on("mouseout", function () {
+                    //hide tooltip and line
+                    tooltip.style("opacity", 0);
+                });
         }
 
+        function feature_highlight() {
+            var feat = feature_select.property('value');
+            d3.selectAll(".dec_node").classed("pulse", false);
+            d3.selectAll(".tree_grid").classed("pulse2", false);
+            if (feat !== "None") {
+                d3.selectAll("." + feat).classed("pulse", true);
+                window.setTimeout(function () {
+                    d3.selectAll("." + feat + "heatmap").classed("pulse2", true);
+                }, 100)
+            }
+        }
+
+        // show classification accuracy on validation data
+        function display_classifications(n) {
+            var score = val_classes[n].score.toString().slice(0, 5);
+            d3.select("#results").text(`Validation Accuracy: ${score}`);
+        }
+
+        // get validation results for the tree represented by [nodes]
         function get_classifications(nodes) {
             var classifications = val_data.map(function (d) {
                 return classify(d, Number(d['label']), nodes);
@@ -316,6 +469,7 @@
             return class_data;
         }
 
+        //tree traversal helper
         function traverse(data, nodes, current, path) {
             var curr_node = nodes[current].data;
             path.push(curr_node.id);
