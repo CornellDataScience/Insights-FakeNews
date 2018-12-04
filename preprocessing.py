@@ -215,3 +215,46 @@ class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
         stances_tr = stances.loc[stances["Body ID"].isin(bodies_tr), :]
         stances_val = stances.loc[stances["Body ID"].isin(bodies_val), :]
         return stances_tr, stances_val
+
+    def process_word_stance(self, word, glove_dict):
+        #50d word vector
+        if word in glove_dict:
+            wv = glove_dict[word]
+        else:
+            wv = np.zeros((50, ))
+        #4d sentiment
+        sent = self.get_sentiment(word)
+        #36d one-hot encoding of part of speech
+        pos = nltk.pos_tag(word)[1]
+        pos_encoding = [(1 if tag == pos else 0) for tag in self.pos_tags]
+        #boolean flag for negating word
+        stemmed_word = self.stem_word(word)
+        is_neg = (1 if stemmed_word in self.negating_words_stemmed else 0)
+        is_refuting = (1 if stemmed_word in self.refuting_words_stemmed else 0)
+        embedding = np.concatenate([wv, [sent["pos"], sent["neg"], sent["neu"], sent["compound"], is_neg, is_refuting], pos_encoding])
+        return embedding
+
+    def process_text_stance(self, text, glove_dict, n_words = 20):
+        tokens = self.get_clean_tokens(text, False)
+        if len(tokens)>=n_words:
+            tokens = tokens[:n_words]
+            encoding = np.array([self.process_word_stance(token, glove_dict) for token in tokens])
+        elif len(tokens)<n_words:
+            padding = [np.zeros((92,))]*(n_words-len(tokens))
+            encoding = np.array([self.process_word_stance(token, glove_dict) for token in tokens]+padding)
+        return encoding
+
+    def process_bodies_stance(self, df, glove_dict):
+        body_info = {}
+        ids = list(df["Body ID"])
+        for i in range(len(ids)):
+            if i % 100 == 0 and i != 0:
+                print("processed "+str(i))
+            body_info[ids[i]] = self.process_text_stance(self.get_body(ids[i],df), glove_dict, 40)
+        print("done! processed " + str(len(ids)))
+        return body_info
+
+    def process_feats_stance(self, data, body_dict, glove_dict):
+        headline, body_id = data[0], int(data[1])
+        padding = [np.zeros((92,))]*(10)
+        return np.concatenate([self.process_text_stance(headline, glove_dict), np.array(padding), body_dict[body_id]])

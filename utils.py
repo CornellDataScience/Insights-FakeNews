@@ -5,7 +5,8 @@ UTILS FUNCTIONS TO HELP WITH VIS
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import json
-import preprocessing
+import matplotlib.pyplot as plt
+import itertools
 
 """
 modified from:
@@ -123,3 +124,34 @@ def rf_json_dump(model, feature_names, out_file):
     data = rf_to_dict(model, feature_names)
     with open(out_file, 'w') as outfile:  
         json.dump(data, outfile)
+
+#taken from a sklearn tutorial
+def plot_confusion_matrix(cm, classes,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    print("Normalized confusion matrix")
+
+    print(cm)
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.3f'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.tight_layout()

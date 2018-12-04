@@ -1,31 +1,43 @@
 import re
 import nltk
 from nltk.corpus import stopwords
+from nltk.stem.porter import *
 
 
 class Helpers():
 
     def __init__(self):
         self.wnl = nltk.WordNetLemmatizer()
+        self.stemmer = PorterStemmer()
         """
         negating words list taken from qdap package for R
         https://github.com/trinker/qdapDictionaries
         """
-        self.negating_words_lemmatized = set(["ain", "aren", "can", "couldn", "didn", "doesn", "don", "hasn", "isn", "mightn", "mustn",
-                                              "neither", "never", "no", "nobody", "nor", "not", "shan", "shouldn", "wasn", "weren", "won", "wouldn"])
+        #removed two of the words because lemmatizing can't and won't turn them into can and won
+        self.negating_words_lemmatized = set(["ain", "aren", "couldn", "didn", "doesn", "don", "hasn", "isn", "mightn", "mustn",
+                                              "neither", "never", "no", "nobody", "nor", "not", "shan", "shouldn", "wasn", "weren", "wouldn"])
+        self.negating_words_stemmed = set(["ain", "aren", "couldn", "didn", "doesn", "don", "hasn", "isn", "mightn", "mustn",
+                                              "neither", "never", "no", "nobodi", "nor", "not", "shan", "shouldn", "wasn", "weren", "wouldn"])
         self.negating_words = set(["ain't", "aren't", "can't", "couldn't", "didn't", "doesn't", "don't", "hasn't", "isn't", "mightn't",
                                    "mustn't", "neither", "never", "no", "nobody", "nor", "not", "shan't", "shouldn't", "wasn't", "weren't", "won't", "wouldn't"])
+        
+        self.refuting_words = set(['fake','fraud', 'hoax', 'false', 'deny', 'denies', 'despite', 'nope', 'doubt', 'bogus', 'debunk', 'prank', 'retract'])
+        self.refuting_words_stemmed = set(['fake','fraud', 'hoax', 'fals', 'deni', 'despit', 'nope', 'doubt', 'bogu', 'debunk', 'prank', 'retract'])
+        
         self.stop_words = set(stopwords.words('english'))
         self.pos_tags = ["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "PRP$", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WP$", "WRB"]
 
     """
-    takes word and lemmatizes/makes lowercase
+    takes word and stems or lemmatizes+makes lowercase
     in: string
     out: string
     """
 
     def normalize_word(self, w):
         return self.wnl.lemmatize(w).lower()
+
+    def stem_word(self,w):
+        return self.stemmer.stem(w).lower()
 
     """
     lemmatized, lowercased tokens
@@ -73,10 +85,13 @@ class Helpers():
     out: string list
     """
 
-    def get_clean_tokens(self, body, remove_negation=True):
+    def get_clean_tokens(self, body, remove_negation=True, stem = False):
         clean_body = self.clean(body)
         tokens = self.get_tokenized_lemmas(clean_body)
         clean_tokens = self.remove_stopwords(tokens, remove_negation)
+        if stem:
+            stems = [self.stem_word(w) for w in clean_tokens]
+            clean_tokens = [i for i in stems if len(i) > 1]
         return clean_tokens
 
     """
