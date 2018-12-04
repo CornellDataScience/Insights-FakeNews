@@ -9,20 +9,20 @@
 
     @keyframes pulse {
         0% {
-            stroke-width: 1px;
+            opacity: 0.25;
         }
 
         50% {
-            stroke-width: 10px;
+            opacity: 1;
         }
 
         100% {
-            stroke-width: 1px;
+            opacity: 0.25;
         }
     }
 
     .pulse {
-        stroke: yellow;
+        fill: yellow;
         animation: pulse 0.5s linear infinite;
     }
 
@@ -47,10 +47,11 @@
     }
 
     div {
-        background-color: grey;
+        background-color: whitesmoke;
         color: black;
         font-family: Arial;
-        padding: 15px;
+        padding-left: 15px;
+        padding-right: 15px;
         font: 18px;
     }
 
@@ -59,10 +60,8 @@
         padding-right: 10px;
     }
 
-    button {
-        border-radius: 5px;
-        padding: 5px;
-        margin-top: 5px;
+    #topbar{
+        padding-top: 15px
     }
 
     circle {
@@ -80,10 +79,11 @@
 <!-- built off of code from: http://bl.ocks.org/mdml/7537455 -->
 
 <body>
-    <div>
+    <div id = 'topbar'>
         <div class='row'>
             <div class='col-sm-3'>
                 <div class='card'>
+                    <br>
                     <span>Select Tree</span>
                     <select id='tree_select'></select>
                     <br>
@@ -91,6 +91,7 @@
                     <br>
                     <span>Highlight Feature Nodes</span>
                     <select id='feature_select'></select>
+                    <br>
                 </div>
             </div>
             <div class='col-sm-9'>
@@ -134,8 +135,8 @@
 
         var tooltip = d3.select("body").append("div")
             .attr("id", "tooltip")
-            .style("color", 'white')
-            .style("background", "gray")
+            .style("color", 'black')
+            .style("background", "white")
             .style("padding", "6px")
             .style("opacity", 0)
             .style("position", "absolute");
@@ -191,7 +192,7 @@
                 .enter().append("path")
                 .attr("class", "link")
                 .attr("fill", "none")
-                .attr("stroke", "silver")
+                .attr("stroke","gray")
                 .attr("stroke-width", "1.5px")
                 .attr("d", function (d) {
                     return `M${d.y},${d.x}C${d.parent.y},${d.x} ${d.parent.y},${d.parent.x} ${d.parent.y},${d.parent.x}`;
@@ -213,7 +214,7 @@
                 .attr("fill", function (d) {
                     return colorScale(d.data.leaf_labels[1] / (d.data.leaf_labels[0] + d.data.leaf_labels[1]));
                 })
-                .attr("stroke", "silver")
+                .attr("stroke", "whitesmoke")
                 .attr("stroke-width", "1px")
                 .attr("class", function (d) {
                     if (d.children) {
@@ -227,19 +228,58 @@
                     //hide tooltip and line
                     tooltip.style("opacity", 0);
                 });
+            
+            // node.append("rect")
+            //     .attr("transform", function (d) {
+            //         var rad = (d.children ? 5 * radiusScale(d.data.leaf_labels[1] + d.data.leaf_labels[0]) : 12);
+            //         return "translate(" + (-rad-5)+ "," + (-rad-5) + ")";
+            //     })
+            //     .attr("width", function (d) {
+            //         return 2 * (d.children ? 5 * radiusScale(d.data.leaf_labels[1] + d.data.leaf_labels[0]) : 12) + 10;
+            //     })
+            //     .attr("height", function (d) {
+            //         return 2 * (d.children ? 5 * radiusScale(d.data.leaf_labels[1] + d.data.leaf_labels[0]) : 12) + 10;
+            //     })
+            node.append("circle")
+                .attr("r", function (d) {
+                    return d.children ? 5 * radiusScale(d.data.leaf_labels[1] + d.data.leaf_labels[0]) : 12;
+                })
+                .attr("fill", "gold")
+                .attr("stroke", "whitesmoke")
+                .style("opacity", "0")
+                .attr("stroke-width", function (d){
+                    if (d.children) {
+                        return "0px";
+                    } else {
+                        return "3px";
+                    }
+                })
+                .attr("class", function (d) {
+                    if (d.children) {
+                        return "dec_node " + d.data.feature + "box";
+                    } else {
+                        return "leaf " + (d.data.leaf_labels[0] < d.data.leaf_labels[1] ? "decide1" : "decide0");
+                    }
+                })
+                .on("mousemove", draw_tooltip)
+                .on("mouseout", function () {
+                    //hide tooltip and line
+                    tooltip.style("opacity", 0);
+                });
 
-            // draw tooltip
+            // text labels
             node.append("text")
                 .attr("dx", 0)
                 .attr("dy", function (d) {
                     return d.depth < 4 ? -20 : (d.parent.children[0].data.name == d.data.name ? -20 : 25);
                 })
                 .attr("fill", function (d) {
-                    if (d.children) {
-                        return "white";
-                    } else {
-                        return (d.data.leaf_labels[0] < d.data.leaf_labels[1] ? "lightskyblue" : "lightsalmon");
-                    }
+                    return "gray"
+                    // if (d.children) {
+                    //     return "black";
+                    // } else {
+                    //     return (d.data.leaf_labels[0] < d.data.leaf_labels[1] ? "navy" : "maroon");
+                    // }
                 })
                 .style("text-anchor", "middle")
                 .style("pointer-events", "none")
@@ -321,7 +361,7 @@
                     var depth = root.height;
 
                     var tree_layout = d3.cluster()
-                        .size([Math.pow(width, (depth - 5)) - 100, height * (depth - 5) - 100])
+                        .size([Math.pow(width, (depth - 5)) - 100, height * 3/4 * (depth - 5) - 100])
                         .separation(function (a, b) {
                             return a.parent == b.parent ? 1 : 1;
                         });
@@ -416,9 +456,9 @@
                 .attr('fill', function (d) {
                     return scoreScale(d.score);
                 })
-                .on('click', function (d, i) {
+                .on('click', function (d) {
                     svg.selectAll("*").remove();
-                    drawTree(Number(i));
+                    drawTree(Number(d.num));
                 })
                 .on("mousemove", draw_tooltip_agg)
                 .on("mouseout", function () {
@@ -432,7 +472,7 @@
             d3.selectAll(".dec_node").classed("pulse", false);
             d3.selectAll(".tree_grid").classed("pulse2", false);
             if (feat !== "None") {
-                d3.selectAll("." + feat).classed("pulse", true);
+                d3.selectAll("." + feat + "box").classed("pulse", true);
                 window.setTimeout(function () {
                     d3.selectAll("." + feat + "heatmap").classed("pulse2", true);
                 }, 100)
