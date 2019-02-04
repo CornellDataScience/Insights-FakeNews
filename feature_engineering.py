@@ -460,6 +460,7 @@ class FeatureEngineering(Helpers):
             headline_data['tokens'], body_dict[body_id]['significant_sentence']['tokens'])
 
         return {
+            'headline_data': headline_data,
             'shared_nouns': shared_common_nouns,
             'shared_verbs': shared_common_verbs,
             'shared_bigrams': shared_bigrams,
