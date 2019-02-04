@@ -357,6 +357,7 @@ class FeatureEngineering(Helpers):
         vader_sentiment = self.get_sentiment(s)
 
         return {
+            "raw": s,
             "tokens": clean_tokens,
             "bigrams": bigram_str,
             "nouns": nouns,
@@ -493,7 +494,7 @@ class FeatureEngineering(Helpers):
             'sentiment_pos': sentiment_diff['pos'],
             'sentiment_neg': sentiment_diff['neg'],
             'sentiment_neu': sentiment_diff['neu'],
-            'sentiment_compound': sentiment_diff_first['compound'],
+            'sentiment_compound': sentiment_diff['compound'],
 
             'sentiment_pos_fst': sentiment_diff_first['pos'],
             'sentiment_neg_fst': sentiment_diff_first['neg'],
