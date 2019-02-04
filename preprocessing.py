@@ -161,6 +161,7 @@ class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
         vader_sentiment = self.sentiment_multi(body)
 
         return {
+            "raw" : body,
             "tokens": clean_tokens,
             "bigrams": bigram_str,
             "nouns": nouns,
@@ -172,7 +173,7 @@ class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
             "significant_sentence": most_significant_sentence_data,
             "adj_types": adj_types,
             "adv_types": adv_types,
-            "vocabulary": set(clean_tokens),
+            "vocabulary": list(set(clean_tokens)),
             "common_tokens": common_tokens,
             "common_nouns": common_nouns,
             "common_verbs": common_verbs,

@@ -357,6 +357,7 @@ class FeatureEngineering(Helpers):
         vader_sentiment = self.get_sentiment(s)
 
         return {
+            "raw": s,
             "tokens": clean_tokens,
             "bigrams": bigram_str,
             "nouns": nouns,
