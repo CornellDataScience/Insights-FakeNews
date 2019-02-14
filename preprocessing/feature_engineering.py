@@ -505,5 +505,6 @@ class FeatureEngineering(Helpers):
             'sentiment_pos_sig': sentiment_diff_sig['pos'],
             'sentiment_neg_sig': sentiment_diff_sig['neg'],
             'sentiment_neu_sig': sentiment_diff_sig['neu'],
-            'sentiment_compound_sig': sentiment_diff_sig['compound']
+            'sentiment_compound_sig': sentiment_diff_sig['compound'],
+            'body_id': body_id
         }
