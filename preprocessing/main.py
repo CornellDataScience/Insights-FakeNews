@@ -70,10 +70,10 @@ class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
     def process_body(self, body, idf=None):
         sentences = list(nltk.tokenize.sent_tokenize(body))
         # sentences are tokenized
-        clean_sentences = [self.get_clean_tokens(s) for s in sentences]
-        clean_sentences = [s for s in clean_sentences if len(s) > 3]
+        clean_sentences = [(s, self.get_clean_tokens(s)) for s in sentences]
+        clean_sentences = [s for s in clean_sentences if len(s[1]) > 3]
         clean_tokens = [
-            token for sentence in clean_sentences for token in sentence]
+            token for sentence in clean_sentences for token in sentence[1]]
         body_length = len(clean_tokens)
 
         # look at first sentence of article
@@ -111,12 +111,11 @@ class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
             common_verbs = [x[0] for x in v_counter.most_common(5)]
             common_tokens = [x[0] for x in token_counter.most_common(5)]
             # this is really shitty
-            sentence_importance = [(s, self.score_sentence(s, word_count))
+            sentence_importance = [(s, self.score_sentence(s[1], word_count))
                                    for s in clean_sentences]
             most_significant_sentence, sentence_score = list(
                 sorted(sentence_importance, key=lambda x: x[1]))[-1]
-            most_significant_sentence_data = self.process_sentence(
-                ' '.join(most_significant_sentence))
+            most_significant_sentence_data = self.process_sentence(most_significant_sentence[0])
 
         else:
             avg_idf = idf["_avg"]
@@ -135,11 +134,11 @@ class Preprocessing(FeatureEngineering, WordEmbeddings, Helpers):
             common_tokens = sorted(t_tfidf, key=t_tfidf.get, reverse=True)[:5]
 
             sentence_importance = [
-                (s, self.score_sentence(s, word_count, idf)) for s in clean_sentences]
+                (s, self.score_sentence(s[1], word_count, idf)) for s in clean_sentences]
             most_significant_sentence, sentence_score = list(
                 sorted(sentence_importance, key=lambda x: x[1]))[-1]
             most_significant_sentence_data = self.process_sentence(
-                ' '.join(most_significant_sentence))
+                most_significant_sentence[0])
 
         # no idf for bigrams increase "common" count to 10
         common_bigrams = [x[0] for x in b_counter.most_common(10)]
