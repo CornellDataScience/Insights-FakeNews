@@ -128,7 +128,7 @@ def rf_json_dump(model, feature_names, out_file):
 #taken from a sklearn tutorial
 def plot_confusion_matrix(cm, classes,
                           title='Confusion matrix',
-                          cmap=plt.cm.Blues):
+                          cmap=plt.cm.binary):
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
@@ -140,7 +140,9 @@ def plot_confusion_matrix(cm, classes,
 
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)
-    plt.colorbar()
+    cbar = plt.colorbar()
+    cbar.set_clim(vmin=0,vmax=1)
+    cbar.set_ticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45)
     plt.yticks(tick_marks, classes)
