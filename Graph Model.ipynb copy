@@ -1,0 +1,1625 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 107,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import spacy\n",
+    "import networkx as nx\n",
+    "import score as sc\n",
+    "import time\n",
+    "from sklearn.metrics import confusion_matrix, pairwise\n",
+    "from scipy.spatial import distance\n",
+    "from preprocessing.utils import plot_confusion_matrix\n",
+    "import matplotlib.pyplot as plt\n",
+    "import nltk\n",
+    "from collections import Counter, defaultdict\n",
+    "from torch.autograd import Variable\n",
+    "import torch.nn as nn\n",
+    "import torch.nn.functional as F\n",
+    "import itertools\n",
+    "import torch\n",
+    "import importlib"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 126,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# import matplotlib.cm\n",
+    "# print(matplotlib.cm.cmap_d.keys())\n",
+    "import sys\n",
+    "importlib.reload(sys.modules['preprocessing.utils'])\n",
+    "from preprocessing.utils import plot_confusion_matrix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "#https://github.com/huggingface/neuralcoref\n",
+    "#note: this NEEDS spacy 2.0.12 to work! downgrade with pip install spacy=2.0.12\n",
+    "import en_coref_md\n",
+    "nlp = spacy.load('en_core_web_sm')\n",
+    "coref = en_coref_md.load()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "negating_words = set([\n",
+    "    \"n't\", \"not\", \"no\", \n",
+    "    \"never\", \"nobody\", \"non\", \"nope\"])\n",
+    "doubting_words = set([\n",
+    "    'fake','fraud', 'hoax', \n",
+    "    'false', 'deny', 'denies', \n",
+    "    'despite', 'doubt', \n",
+    "    'bogus', 'debunk', 'prank', \n",
+    "    'retract', 'scam', \"withdrawn\",\n",
+    "    \"misinformation\"])\n",
+    "hedging_words = set([\n",
+    "    'allege', 'allegedly','apparently',\n",
+    "    'appear','claim','could',\n",
+    "    'evidently','largely','likely',\n",
+    "    'mainly','may', 'maybe', 'might',\n",
+    "    'mostly','perhaps','presumably',\n",
+    "    'probably','purport', 'purportedly',\n",
+    "    'reported', 'reportedly',\n",
+    "    'rumor', 'rumour', 'rumored', 'rumoured',\n",
+    "    'says','seem','somewhat',\n",
+    "    'unconfirmed'])\n",
+    "sus_words = doubting_words.union(hedging_words)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 231,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_batch(data, targets, i,batch_size):\n",
+    "    batches = data[i*batch_size:i*batch_size+batch_size]\n",
+    "    results = targets[i*batch_size:i*batch_size+batch_size]\n",
+    "    results = [(2.0 if result == \"agree\" else (1.0 if result == \"discuss\" else 0.0)) for result in results]\n",
+    "    return np.swapaxes(np.array([x[0] for x in batches]),0,1), np.array(results)\n",
+    "\n",
+    "def eval_model(model, data):\n",
+    "    correct = 0\n",
+    "    total = 0\n",
+    "    batch_x_test,batch_y_test = get_batch(data[0], data[1],0, len(data[0]))\n",
+    "    model.eval()\n",
+    "    predicted = None\n",
+    "    with torch.no_grad():\n",
+    "        inputs = Variable(torch.FloatTensor(batch_x_test))\n",
+    "        labels = torch.LongTensor(batch_y_test)\n",
+    "        outputs = model(inputs)\n",
+    "        _, predicted = torch.max(outputs.data, 1)\n",
+    "        total += labels.size(0)\n",
+    "        correct += (predicted == labels).sum()\n",
+    "\n",
+    "    print('Accuracy: %d %%' % (100 * correct / total))\n",
+    "    return predicted\n",
+    "\n",
+    "def binary_accuracy(preds, y):\n",
+    "    \"\"\"\n",
+    "    Returns accuracy per batch, i.e. if you get 8/10 right, this returns 0.8, NOT 8\n",
+    "    \"\"\"\n",
+    "    correct = (preds == y).float() #convert into float for division \n",
+    "    acc = correct.sum()/len(correct)\n",
+    "    return acc\n",
+    "\n",
+    "def train(model, total_batch, optimizer, criterion, data):\n",
+    "    epoch_loss = 0\n",
+    "    epoch_acc = 0\n",
+    "    model.train()\n",
+    "    for i in range(total_batch):\n",
+    "        batch_x,batch_y = get_batch(data[0], data[1],i, batch_size)\n",
+    "        #print(batch_x, batch_y)\n",
+    "        inputs = Variable(torch.FloatTensor(batch_x))\n",
+    "        labels = Variable(torch.LongTensor(batch_y))\n",
+    "        optimizer.zero_grad()\n",
+    "        predictions = model(inputs)\n",
+    "        loss = criterion(predictions, labels)\n",
+    "        _, predicted = torch.max(predictions.data, 1)\n",
+    "        acc = binary_accuracy(predicted, labels)\n",
+    "        loss.backward()\n",
+    "        optimizer.step()\n",
+    "        epoch_loss += loss.item()\n",
+    "        epoch_acc += acc.item()\n",
+    "    return epoch_loss / total_batch, epoch_acc / total_batch\n",
+    "\n",
+    "def evaluate(model, total_batch, criterion, data):\n",
+    "    epoch_loss = 0\n",
+    "    epoch_acc = 0\n",
+    "    model.eval()\n",
+    "    with torch.no_grad():\n",
+    "        for i in range(total_batch):\n",
+    "            batch_x,batch_y = get_batch(data[0], data[1],i,batch_size)\n",
+    "            inputs = Variable(torch.FloatTensor(batch_x))\n",
+    "            labels = Variable(torch.LongTensor(batch_y))\n",
+    "            predictions = model(inputs)\n",
+    "            loss = criterion(predictions, labels)\n",
+    "            _, predicted = torch.max(predictions.data, 1)\n",
+    "            acc = binary_accuracy(predicted, labels)\n",
+    "            epoch_loss += loss.item()\n",
+    "            epoch_acc += acc.item()\n",
+    "    return epoch_loss / total_batch, epoch_acc / total_batch"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer\n",
+    "vader = SentimentIntensityAnalyzer()\n",
+    "\n",
+    "def get_sentiment(sentence):\n",
+    "    sent =  vader.polarity_scores(sentence.text)\n",
+    "    return [sent[\"pos\"],sent[\"neg\"],sent[\"neu\"],sent[\"compound\"]]\n",
+    "\n",
+    "def get_avg_sentiment(lst):\n",
+    "    sents = np.array([get_sentiment(s) for s in lst])\n",
+    "    return list(np.mean(sents, axis = 0))\n",
+    "\n",
+    "def get_diff_sentiment(a,b):\n",
+    "    return list(np.absolute(np.array(a) - np.array(b)))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def train_test_split(bodies, stances, split=0.8):\n",
+    "    idx = np.random.permutation(np.arange(len(bodies)))\n",
+    "    bodies = bodies.values[idx]\n",
+    "    train = int(len(bodies)*0.8)\n",
+    "    bodies_tr = set([i[0] for i in bodies[:train]])\n",
+    "    bodies_val = set([i[0] for i in bodies[train:]])\n",
+    "    stances_tr = stances.loc[stances[\"Body ID\"].isin(bodies_tr), :]\n",
+    "    stances_val = stances.loc[stances[\"Body ID\"].isin(bodies_val), :]\n",
+    "    return stances_tr, stances_val"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(13427, 3)\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style>\n",
+       "    .dataframe thead tr:only-child th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: left;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Headline</th>\n",
+       "      <th>Body ID</th>\n",
+       "      <th>Stance</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>Hundreds of Palestinians flee floods in Gaza a...</td>\n",
+       "      <td>158</td>\n",
+       "      <td>agree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>Spider burrowed through tourist's stomach and ...</td>\n",
+       "      <td>1923</td>\n",
+       "      <td>disagree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>5</th>\n",
+       "      <td>'Nasa Confirms Earth Will Experience 6 Days of...</td>\n",
+       "      <td>154</td>\n",
+       "      <td>agree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>8</th>\n",
+       "      <td>Banksy 'Arrested &amp; Real Identity Revealed' Is ...</td>\n",
+       "      <td>1739</td>\n",
+       "      <td>agree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>10</th>\n",
+       "      <td>Gateway Pundit</td>\n",
+       "      <td>2327</td>\n",
+       "      <td>discuss</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>11</th>\n",
+       "      <td>Woman detained in Lebanon is not al-Baghdadi's...</td>\n",
+       "      <td>1468</td>\n",
+       "      <td>agree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>14</th>\n",
+       "      <td>Soon Marijuana May Lead to Ticket, Not Arrest,...</td>\n",
+       "      <td>47</td>\n",
+       "      <td>discuss</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>16</th>\n",
+       "      <td>Boko Haram Denies Nigeria Cease-Fire Claim</td>\n",
+       "      <td>2463</td>\n",
+       "      <td>discuss</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>17</th>\n",
+       "      <td>No, Robert Plant Didn’t Rip Up an $800 Million...</td>\n",
+       "      <td>295</td>\n",
+       "      <td>agree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>19</th>\n",
+       "      <td>ISIL Beheads American Photojournalist in Iraq</td>\n",
+       "      <td>608</td>\n",
+       "      <td>discuss</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>21</th>\n",
+       "      <td>Boko Haram ceasefire ignored as violence flare...</td>\n",
+       "      <td>1681</td>\n",
+       "      <td>discuss</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>24</th>\n",
+       "      <td>NET Extra: Back-from-the-dead Catholic priest ...</td>\n",
+       "      <td>1014</td>\n",
+       "      <td>agree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>25</th>\n",
+       "      <td>Rumor debunked: RoboCop-style robots are not p...</td>\n",
+       "      <td>633</td>\n",
+       "      <td>agree</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>29</th>\n",
+       "      <td>Report: Christian Bale Just Bailed on the Stev...</td>\n",
+       "      <td>1157</td>\n",
+       "      <td>discuss</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>31</th>\n",
+       "      <td>Insurgents killed in Nigeria despite alleged t...</td>\n",
+       "      <td>1896</td>\n",
+       "      <td>discuss</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                                             Headline  Body ID    Stance\n",
+       "1   Hundreds of Palestinians flee floods in Gaza a...      158     agree\n",
+       "4   Spider burrowed through tourist's stomach and ...     1923  disagree\n",
+       "5   'Nasa Confirms Earth Will Experience 6 Days of...      154     agree\n",
+       "8   Banksy 'Arrested & Real Identity Revealed' Is ...     1739     agree\n",
+       "10                                     Gateway Pundit     2327   discuss\n",
+       "11  Woman detained in Lebanon is not al-Baghdadi's...     1468     agree\n",
+       "14  Soon Marijuana May Lead to Ticket, Not Arrest,...       47   discuss\n",
+       "16         Boko Haram Denies Nigeria Cease-Fire Claim     2463   discuss\n",
+       "17  No, Robert Plant Didn’t Rip Up an $800 Million...      295     agree\n",
+       "19      ISIL Beheads American Photojournalist in Iraq      608   discuss\n",
+       "21  Boko Haram ceasefire ignored as violence flare...     1681   discuss\n",
+       "24  NET Extra: Back-from-the-dead Catholic priest ...     1014     agree\n",
+       "25  Rumor debunked: RoboCop-style robots are not p...      633     agree\n",
+       "29  Report: Christian Bale Just Bailed on the Stev...     1157   discuss\n",
+       "31  Insurgents killed in Nigeria despite alleged t...     1896   discuss"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train_stances = pd.read_csv(\"fn_data/train_stances.csv\")\n",
+    "train_stances = train_stances.loc[lambda x: x.Stance != \"unrelated\"]\n",
+    "print(train_stances.shape)\n",
+    "train_stances.head(15)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(1683, 2)\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style>\n",
+       "    .dataframe thead tr:only-child th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: left;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Body ID</th>\n",
+       "      <th>articleBody</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>0</td>\n",
+       "      <td>A small meteorite crashed into a wooded area i...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>4</td>\n",
+       "      <td>Last week we hinted at what was to come as Ebo...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>5</td>\n",
+       "      <td>(NEWSER) – Wonder how long a Quarter Pounder w...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>6</td>\n",
+       "      <td>Posting photos of a gun-toting child online, I...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>7</td>\n",
+       "      <td>At least 25 suspected Boko Haram insurgents we...</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   Body ID                                        articleBody\n",
+       "0        0  A small meteorite crashed into a wooded area i...\n",
+       "1        4  Last week we hinted at what was to come as Ebo...\n",
+       "2        5  (NEWSER) – Wonder how long a Quarter Pounder w...\n",
+       "3        6  Posting photos of a gun-toting child online, I...\n",
+       "4        7  At least 25 suspected Boko Haram insurgents we..."
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train_bodies = pd.read_csv(\"fn_data/train_bodies.csv\")\n",
+    "print(train_bodies.shape)\n",
+    "train_bodies.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "((10713, 3), (2714, 3))"
+      ]
+     },
+     "execution_count": 41,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "stances_tr, stances_val = train_test_split(train_bodies, train_stances)\n",
+    "stances_tr.shape, stances_val.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 66,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "disagrees = stances_tr[stances_tr[\"Stance\"]==\"disagree\"]\n",
+    "agrees = stances_tr[stances_tr[\"Stance\"]==\"agree\"]\n",
+    "discusses = stances_tr[stances_tr[\"Stance\"]==\"discuss\"]\n",
+    "stances_tr_augmented = pd.concat([stances_tr, agrees, disagrees, disagrees, disagrees, disagrees, disagrees, disagrees]).sample(frac=1).reset_index(drop=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_body(n):\n",
+    "    return train_bodies.loc[lambda x: x[\"Body ID\"] == n, \"articleBody\"].item()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def preprocess(text):\n",
+    "    text = text.replace(\"' \",' ')\n",
+    "    text = text.replace(\" '\",' ')\n",
+    "    text = text.replace(\":\", \". \")\n",
+    "    text = text.replace(\";\", \". \")\n",
+    "    return text"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def cosine_similarity(x,y):\n",
+    "    return 1 - np.nan_to_num(distance.cosine(x,y))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_topics(doc):\n",
+    "    \"\"\"\n",
+    "    get topics of a sentence\n",
+    "    input: spacy doc\n",
+    "    output: dictionary with nouns as the key, and the set of noun chunks that contain the noun as the value\n",
+    "    special entry _vocab has the set of all tokens in the dict\n",
+    "    \"\"\"\n",
+    "    subjs = {}\n",
+    "    for token in doc:\n",
+    "        if token.dep_ in [\"nsubj\", \"nsubjpass\", \"csubj\",\"csubjpass\", \"dobj\", \"dative\", \"attr\", \"oprd\", \"pobj\", \"compound\"]:\n",
+    "            txt = token.lemma_.lower()\n",
+    "            if txt not in subjs:\n",
+    "                subjs[txt] = set([txt])      \n",
+    "    for chunk in doc.noun_chunks:\n",
+    "        if len(chunk.root.text) > 2:\n",
+    "            txt = chunk.root.text.lower()\n",
+    "            if txt not in subjs:\n",
+    "                subjs[txt] = set([txt])\n",
+    "            subjs[txt].add(chunk.text.lower())\n",
+    "    subjects_= []\n",
+    "    for word in subjs:\n",
+    "        for phrase in subjs[word]:\n",
+    "            subjects_ += phrase.split(\" \")\n",
+    "    subjs[\"_vocab\"] = set(subjects_)\n",
+    "    return subjs"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_svos(sent):\n",
+    "    \"\"\"\n",
+    "    input: Spacy processed sentence\n",
+    "    output: dict of subj, dict of v, dict of obj (each word is lemmatized and lowercased)\n",
+    "    each entry in dict has key of lemmatized token, value is actual token (to do traversals with later if needed)\n",
+    "    \"\"\"\n",
+    "    s = {}\n",
+    "    v = {}\n",
+    "    o = {}\n",
+    "    for token in sent:\n",
+    "        if token.dep_ == 'ROOT':\n",
+    "            v[token.lemma_.lower()] = token\n",
+    "        elif token.dep_ in [\"nsubj\", \"nsubjpass\", \"csubj\",\"csubjpass\", \"agent\",\"compound\"]:\n",
+    "            s[token.lemma_.lower()] = token\n",
+    "        elif token.dep_ in [\"dobj\", \"dative\", \"attr\", \"oprd\", \"pobj\"]:\n",
+    "            o[token.lemma_.lower()] = token\n",
+    "    # https://github.com/clir/clearnlp-guidelines/blob/master/md/specifications/dependency_labels.md\n",
+    "    return (s,v,o)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {
+    "collapsed": true,
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "def build_graph(doc):\n",
+    "    \"\"\"\n",
+    "    build a NetworkX graph of the dependency tree\n",
+    "    input: spacy Doc\n",
+    "    output: networkx graph\n",
+    "    \"\"\"\n",
+    "    edges = set()\n",
+    "    for token in doc:\n",
+    "        for child in token.children:\n",
+    "            edges.add((token.lemma_.lower(),child.lemma_.lower()))\n",
+    "    graph = nx.Graph(list(edges))\n",
+    "    return graph"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_summary(doc, subjects, n = 5):\n",
+    "    \"\"\"\n",
+    "    get summary of n sentences in document\n",
+    "    first meaningful sentence will always be returned\n",
+    "    \"\"\"\n",
+    "    subjects_ = subjects[\"_vocab\"]\n",
+    "    def score_sentence(sent):\n",
+    "        # not very robust right now\n",
+    "        score = 0\n",
+    "        word_count = 0\n",
+    "        for token in sent:\n",
+    "            word_count += 1\n",
+    "            t = token.lemma_.lower()\n",
+    "            if t in subjects_:\n",
+    "                score += 1\n",
+    "            elif t in negating_words or t in doubting_words or t in hedging_words:\n",
+    "                score += 0.5\n",
+    "            return score/word_count if word_count > 4 else 0\n",
+    "    sentences = [s for s in doc.sents]\n",
+    "    scored_sentences = [[idx, sent, score_sentence(sent)] for idx, sent in enumerate(sentences)]\n",
+    "    # scored_sentences = [s for s in scored_sentences if s[2] > 0] #filter out non-scoring sentences\n",
+    "    scored_sentences.sort(key = lambda x: x[2], reverse = True)\n",
+    "    top = scored_sentences[:n-1]\n",
+    "    top.sort(key = lambda x: x[0])\n",
+    "    result = [scored_sentences[0][1]] + [s[1] for s in top]\n",
+    "    return result"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_shortest_path_to_negating(graph, subjects):\n",
+    "    \"\"\"\n",
+    "    get the shortest path from each subject to any negating or doubting/hedging word\n",
+    "    returns: dictionary with subject as key, and 2-element list of path lengths [negating, doubting]\n",
+    "    - if a subject does not exist in graph or have a path to any negating word, then the value will be [None, None]\n",
+    "    \"\"\"\n",
+    "    results = {}\n",
+    "    for s in subjects:\n",
+    "        results[s] = [None, None]\n",
+    "        if graph.has_node(s):\n",
+    "            for word in negating_words:\n",
+    "                if word in graph:\n",
+    "                    try:\n",
+    "                        path = nx.shortest_path(graph, source = s, target = word)\n",
+    "                        if results[s][0] == None or len(path) < results[s][0]:\n",
+    "                            results[s][0] = len(path)\n",
+    "                    except:\n",
+    "                        continue\n",
+    "            for word in sus_words:\n",
+    "                if word in graph:\n",
+    "                    try:\n",
+    "                        path = nx.shortest_path(graph, source = s, target = word)\n",
+    "                        if results[s][1] == None or len(path) < results[s][1]:\n",
+    "                            results[s][1] = len(path)\n",
+    "                    except:\n",
+    "                        continue\n",
+    "    return results"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def root_distance(graph, root):\n",
+    "    \"\"\"\n",
+    "    as implemented in the Emergent paper - return the shortest distance between the given root and any \n",
+    "    doubting or hedging words in the graph, or None if no such path exists\n",
+    "    \"\"\"\n",
+    "    if root == None:\n",
+    "        return None\n",
+    "    min_dist = None\n",
+    "    for word in sus_words:\n",
+    "        if word in graph:\n",
+    "            try:\n",
+    "                path = nx.shortest_path(graph, source = root, target = word)\n",
+    "                if min_dist == None or len(path) < min_dist:\n",
+    "                    min_dist = len(path)\n",
+    "            except:\n",
+    "                continue\n",
+    "    return min_dist"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_neg_ancestors(doc):\n",
+    "    \"\"\"\n",
+    "    get the ancestors of every negating word\n",
+    "    input: spacy Doc\n",
+    "    returns: tuple  - set of words that were in the ancestor list of negating words, \n",
+    "    set of words that were in ancestor list of refuting words, # negating words, # refuting words\n",
+    "    \"\"\"\n",
+    "    results = [set(), set(), 0, 0]\n",
+    "    for token in doc:\n",
+    "        if token.lemma_.lower() in negating_words:\n",
+    "            results[0] = results[0].union(\n",
+    "                set([ancestor.lemma_.lower() for ancestor in token.ancestors if len(ancestor) > 2])\n",
+    "            )\n",
+    "            results[2] += 1\n",
+    "        elif token.lemma_.lower() in sus_words:\n",
+    "            results[1] = results[1].union(\n",
+    "                set([ancestor.lemma_.lower() for ancestor in token.ancestors if len(ancestor) > 2])\n",
+    "            )\n",
+    "            results[3] += 1\n",
+    "    return tuple(results)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 76,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Jeh Johnson.  Politicians Shouldn't Feed The Flames Of Fear Over ISIS, Ebola\n",
+      "{'jeh': [None, None], 'politician': [3, None], 'flames': [3, None], 'fear': [5, None], 'isis': [None, None], 'ebola': [None, None], 'johnson': [None, None], 'politicians': [None, None], 'over': [None, None], '_vocab': [None, None]}\n",
+      "{'jeh': {'jeh'}, 'politician': {'politician'}, 'flames': {'flames', 'the flames'}, 'fear': {'fear'}, 'isis': {'isis'}, 'ebola': {'ebola'}, 'johnson': {'jeh johnson', 'johnson'}, 'politicians': {'politicians'}, 'over': {'over'}, '_vocab': {'jeh', 'fear', 'isis', 'politicians', 'flames', 'ebola', 'politician', 'over', 'the', 'johnson'}} ({'jeh': Jeh, 'politician': Politicians}, {'johnson': Johnson, 'feed': Feed, 'over': Over}, {'flames': Flames, 'fear': Fear, 'isis': ISIS, 'ebola': Ebola}) johnson\n",
+      "None\n",
+      "({'feed'}, set(), 1, 0)\n"
+     ]
+    }
+   ],
+   "source": [
+    "h_id = 20\n",
+    "df = agrees\n",
+    "test = nlp(preprocess(list(df.values)[h_id][0]))\n",
+    "print(test)\n",
+    "test_graph = build_graph(test)\n",
+    "test_subj = get_topics(test)\n",
+    "test_svo = get_svos(test)\n",
+    "print(get_shortest_path_to_negating(test_graph, test_subj))\n",
+    "print(test_subj, test_svo, list(test_svo[1].keys())[0])\n",
+    "print(root_distance(test_graph, list(test_svo[1].keys())[0]))\n",
+    "print(get_neg_ancestors(test))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 77,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Homeland Security Secretary Jeh Johnson says Islamic State militants are not entering the U.S. through the southern border. Homeland Security Secretary Jeh Johnson was responding to a claim made by Rep. Duncan Hunter, R-Calif., that at least 10 Islamic State operatives were detained trying to come in from Mexico.\n",
+      "\n",
+      "“We have no credible, specific intelligence to that effect,” Homeland Security Secretary Jeh Johnson said on CNN Wednesday evening of the militants also known as ISIS. “And I look at the intelligence reports from overseas from our southern border from our intelligence community virtually every day, numerous times a day, to be on the lookout for something of that nature. So, what I’d say to the American public is we’re vigilant in looking out for individuals of suspicion who may be crossing we .”\n",
+      "\n",
+      "Johnson never mentioned Hunter by name, but Johnson has called on lawmakers to act responsibly and not frighten Americans. “Let’s not unduly create fear and anxiety in the American public by passing on speculation and rumor,” Johnson said.\n",
+      "\n",
+      "The group Judicial Watch reported late Wednesday that four “Islamic terrorists” had been seized along the southern border within 36 hours. Hunter said in an interview with Fox News on Tuesday that \"at least 10 ISIS fighters have been caught coming across the Mexican border in Texas.\"\n",
+      "\n",
+      "[Homeland Security Secretary Jeh Johnson says Islamic State militants are not entering the U.S. through the southern border., Homeland Security Secretary Jeh Johnson says Islamic State militants are not entering the U.S. through the southern border., We have no credible, specific intelligence to that effect,” Homeland Security Secretary Jeh Johnson said on CNN Wednesday evening of the militants also known as ISIS., Johnson never mentioned Hunter by name, but Johnson has called on lawmakers to act responsibly and not frighten Americans., Let’s not unduly create fear and anxiety in the American public by passing on speculation and rumor,” Johnson said.\n",
+      "\n",
+      "]\n",
+      "{'jeh': [4, 5], 'politician': [None, None], 'flames': [None, None], 'fear': [3, 4], 'isis': [6, 6], 'ebola': [None, None], 'johnson': [3, 4], 'politicians': [None, None], 'over': [None, None], '_vocab': [None, None]}\n",
+      "({'homeland': Homeland, 'security': Security, 'secretary': Secretary, 'jeh': Jeh, 'johnson': Johnson, 'islamic': Islamic, 'state': State, 'militant': militants}, {'say': says}, {'u.s.': U.S., 'border': border})\n",
+      "3\n",
+      "({'enter', 'say'}, set(), 1, 0)\n",
+      "\n",
+      "{'jeh': [4, 5], 'politician': [None, None], 'flames': [None, None], 'fear': [3, 4], 'isis': [6, 6], 'ebola': [None, None], 'johnson': [3, 4], 'politicians': [None, None], 'over': [None, None], '_vocab': [None, None]}\n",
+      "({'homeland': Homeland, 'security': Security, 'secretary': Secretary, 'jeh': Jeh, 'johnson': Johnson, 'islamic': Islamic, 'state': State, 'militant': militants}, {'say': says}, {'u.s.': U.S., 'border': border})\n",
+      "3\n",
+      "({'enter', 'say'}, set(), 1, 0)\n",
+      "\n",
+      "{'jeh': [4, 5], 'politician': [None, None], 'flames': [None, None], 'fear': [3, 4], 'isis': [6, 6], 'ebola': [None, None], 'johnson': [3, 4], 'politicians': [None, None], 'over': [None, None], '_vocab': [None, None]}\n",
+      "({'-pron-': We, 'homeland': Homeland, 'security': Security, 'secretary': Secretary, 'jeh': Jeh, 'johnson': Johnson, 'wednesday': Wednesday}, {'say': said}, {'intelligence': intelligence, 'effect': effect, 'cnn': CNN, 'militant': militants, 'isis': ISIS})\n",
+      "3\n",
+      "({'intelligence', 'have', 'say'}, set(), 1, 0)\n",
+      "\n",
+      "{'jeh': [4, 5], 'politician': [None, None], 'flames': [None, None], 'fear': [3, 4], 'isis': [6, 6], 'ebola': [None, None], 'johnson': [3, 4], 'politicians': [None, None], 'over': [None, None], '_vocab': [None, None]}\n",
+      "({'johnson': Johnson}, {'mention': mentioned}, {'hunter': Hunter, 'name': name, 'lawmaker': lawmakers, 'americans': Americans})\n",
+      "4\n",
+      "({'mention', 'frighten', 'act', 'call'}, set(), 2, 0)\n",
+      "\n",
+      "{'jeh': [4, 5], 'politician': [None, None], 'flames': [None, None], 'fear': [3, 4], 'isis': [6, 6], 'ebola': [None, None], 'johnson': [3, 4], 'politicians': [None, None], 'over': [None, None], '_vocab': [None, None]}\n",
+      "({'-pron-': ’s, 'johnson': Johnson}, {'say': said}, {'fear': fear, 'public': public, 'speculation': speculation})\n",
+      "3\n",
+      "({'say', 'let', 'create'}, {'pass', 'speculation', 'say', 'create', 'let'}, 1, 1)\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "body_text = get_body(list(df.values)[h_id][1])\n",
+    "body = coref(preprocess(body_text))\n",
+    "resolved = body._.coref_resolved\n",
+    "print(resolved)\n",
+    "print(\"\")\n",
+    "body = nlp(resolved)\n",
+    "body_graph = build_graph(body)\n",
+    "summary = get_summary(body, test_subj, 5)\n",
+    "print(summary)\n",
+    "for s in summary:\n",
+    "    svo_s = get_svos(s)\n",
+    "    print(get_shortest_path_to_negating(body_graph, test_subj))\n",
+    "    print(svo_s)\n",
+    "    print(root_distance(body_graph, list(svo_s[1].keys())[0]))\n",
+    "    print(get_neg_ancestors(s))\n",
+    "    print(\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Processed 0\n",
+      "Processed 2500\n",
+      "Processed 5000\n",
+      "Processed 7500\n",
+      "Processed 10000\n",
+      "Processed 12500\n",
+      "Done!\n",
+      "Processed 0\n",
+      "Processed 100\n",
+      "Processed 200\n",
+      "Processed 300\n",
+      "Processed 400\n",
+      "Processed 500\n",
+      "Processed 600\n",
+      "Processed 700\n",
+      "Processed 800\n",
+      "Processed 900\n",
+      "Processed 1000\n",
+      "Processed 1100\n",
+      "Processed 1200\n",
+      "Processed 1300\n",
+      "Processed 1400\n",
+      "Processed 1500\n",
+      "Processed 1600\n",
+      "Done!\n",
+      "783\n"
+     ]
+    }
+   ],
+   "source": [
+    "headline_info = {}\n",
+    "body_info = {}\n",
+    "start = time.time()\n",
+    "stance_data = list(train_stances.values)\n",
+    "body_data = list(train_bodies.values)\n",
+    "for headline in range(len(stance_data)):\n",
+    "    if headline % 2500 == 0:\n",
+    "        print(\"Processed \"+str(headline))\n",
+    "    h, b_id, s = tuple(stance_data[headline])\n",
+    "    nlp_h = nlp(preprocess(h))\n",
+    "    headline_graph = build_graph(nlp_h)\n",
+    "    headline_subj = get_topics(nlp_h)\n",
+    "    headline_svo = get_svos(nlp_h)\n",
+    "    headline_root_dist = root_distance(headline_graph, list(headline_svo[1].keys())[0])\n",
+    "    headline_neg_ancestors = get_neg_ancestors(nlp_h)\n",
+    "    nqh = 0\n",
+    "    for tok in nlp_h:\n",
+    "        if tok.text == \"?\":\n",
+    "            nqh += 1\n",
+    "    headline_info[h] = (nlp_h, headline_graph, headline_subj, headline_svo, headline_root_dist, headline_neg_ancestors, nqh)\n",
+    "print(\"Done!\")\n",
+    "for body in range(len(body_data)):\n",
+    "    if body % 100 == 0:\n",
+    "        print(\"Processed \"+str(body))\n",
+    "    b_id, txt = tuple(body_data[body])\n",
+    "    nlp_a = coref(preprocess(txt))\n",
+    "    nlp_b = nlp(nlp_a._.coref_resolved)\n",
+    "    body_graph = build_graph(nlp_b)\n",
+    "    nqb = 0\n",
+    "    for tok in nlp_b:\n",
+    "        if tok.text == \"?\":\n",
+    "            nqb += 1\n",
+    "    body_info[b_id] = (nlp_b, body_graph, nqb)\n",
+    "print(\"Done!\")\n",
+    "end = time.time()\n",
+    "print(int(end-start))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 147,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def get_sentence_vec(s):\n",
+    "    vecs = [token.vector for token in s]\n",
+    "    return np.nan_to_num(np.sum(vecs, axis = 0))\n",
+    "\n",
+    "def get_features(stance_df, n_sent = 5):\n",
+    "    start = time.time()\n",
+    "    data = list(stance_df.values)\n",
+    "    features = []\n",
+    "    actual = []\n",
+    "    for item in data:\n",
+    "        h, b, s = tuple(item)\n",
+    "        headline, headline_graph, headline_subjs, headline_svo, headline_root_dist, headline_neg_ancestors, nq_h  = headline_info[h]\n",
+    "        body, body_graph, nq_b = body_info[b]\n",
+    "        \n",
+    "        #sometimes the coref deletes bodies that are one sentence\n",
+    "        if len(body) == 0:\n",
+    "            body = nlp(preprocess(get_body(b)))\n",
+    "            body_graph = build_graph(body)\n",
+    "\n",
+    "        #return the shortest path to negating word for each subject in headline_subjs, if one exists\n",
+    "        neg_h = get_shortest_path_to_negating(headline_graph, headline_subjs)\n",
+    "        neg_b = get_shortest_path_to_negating(body_graph, headline_subjs)\n",
+    "\n",
+    "        #body summary\n",
+    "        summary = get_summary(body, headline_subjs, n_sent)\n",
+    "        first_summ_sentence = summary[0]\n",
+    "        \n",
+    "        summary_svos = [get_svos(s) for s in summary]\n",
+    "        summary_root_dist = [root_distance(body_graph, list(s[1].keys())[0]) for s in summary_svos]\n",
+    "        summary_neg_ancestors = [get_neg_ancestors(s) for s in summary]\n",
+    "        summary_neg_counts = [s[2:] for s in summary_neg_ancestors]\n",
+    "        \n",
+    "        #svo\n",
+    "        body_s, body_v, body_o = {}, {}, {}\n",
+    "        headline_s, headline_v, headline_o = headline_svo\n",
+    "        for svo in summary_svos:\n",
+    "            body_s.update(svo[0])\n",
+    "            body_v.update(svo[1])\n",
+    "            body_o.update(svo[2])\n",
+    "        body_s_vec = list(np.sum([body_s[s].vector for s in body_s], axis = 0)) if len(body_s) > 0 else np.zeros(384)\n",
+    "        body_v_vec = list(np.sum([body_v[s].vector for s in body_v], axis = 0)) if len(body_v) > 0 else np.zeros(384)\n",
+    "        body_o_vec = list(np.sum([body_o[s].vector for s in body_o], axis = 0)) if len(body_o) > 0 else np.zeros(384)\n",
+    "    \n",
+    "        headline_s_vec = list(np.sum([headline_s[s].vector for s in headline_s], axis = 0)) if len(headline_s) > 0 else np.zeros(384)\n",
+    "        headline_v_vec = list(np.sum([headline_v[s].vector for s in headline_v], axis = 0)) if len(headline_v) > 0 else np.zeros(384)\n",
+    "        headline_o_vec = list(np.sum([headline_o[s].vector for s in headline_o], axis = 0)) if len(headline_o) > 0 else np.zeros(384)\n",
+    "        \n",
+    "        cos_sim_s = cosine_similarity(body_s_vec, headline_s_vec)\n",
+    "        cos_sim_v = cosine_similarity(body_v_vec, headline_v_vec)\n",
+    "        cos_sim_o = cosine_similarity(body_o_vec, headline_o_vec)\n",
+    "        \n",
+    "        #negating paths\n",
+    "        headline_paths = [neg_h[x] for x in neg_h]\n",
+    "        headline_neg_paths = [1 if x[0] != None else 0 for x in headline_paths] + [1]\n",
+    "        headline_hedge_paths = [1 if x[1] != None else 0 for x in headline_paths] + [1]\n",
+    "        body_paths = [neg_h[x] for x in neg_h]\n",
+    "        body_neg_paths = [1 if x[0] != None else 0 for x in body_paths] + [1]\n",
+    "        body_hedge_paths = [1 if x[1] != None else 0 for x in body_paths] + [1]\n",
+    "        \n",
+    "        neg_path_cos_sim = cosine_similarity(headline_neg_paths, body_neg_paths)\n",
+    "        hedge_path_cos_sim = cosine_similarity(headline_hedge_paths, body_hedge_paths)\n",
+    "        \n",
+    "        #root distance\n",
+    "        avg_summary_root_dist = None\n",
+    "        non_null = [x for x in summary_root_dist if x != None]\n",
+    "        if len(non_null) != 0:\n",
+    "            avg_summary_root_dist = sum(non_null)/len(non_null)\n",
+    "        root_dist_feats = [headline_root_dist, avg_summary_root_dist]\n",
+    "        root_dist_feats = [x if x != None else 100 for x in root_dist_feats]\n",
+    "    \n",
+    "        #sentiment\n",
+    "        headline_sent = get_sentiment(headline)\n",
+    "        body_sents = [get_sentiment(s) for s in summary]\n",
+    "        diff_sents = list(np.sum([get_diff_sentiment(headline_sent, s) for s in body_sents], axis = 0))\n",
+    "        \n",
+    "        #bow\n",
+    "        headline_vocab = set([tok.lemma_.lower() for tok in headline])\n",
+    "        fst_summ_vocab = set([tok.lemma_.lower() for tok in first_summ_sentence])\n",
+    "        total_vocab = list(headline_vocab.union(fst_summ_vocab))\n",
+    "        headline_embedding = [1 if tok in headline_vocab else 0 for tok in total_vocab]\n",
+    "        fst_summ_embedding = [1 if tok in fst_summ_vocab else 0 for tok in total_vocab]\n",
+    "        bow_cos_sim = cosine_similarity(headline_embedding, fst_summ_embedding)\n",
+    "        \n",
+    "        #word vecs\n",
+    "        cos_sims = [cosine_similarity(get_sentence_vec(s), headline.vector) for s in summary]\n",
+    "        fst_cos_sim = cos_sims[0]\n",
+    "        avg_cos_sim = sum(cos_sims)/len(cos_sims)\n",
+    "        \n",
+    "        #build final features list\n",
+    "        fts = (\n",
+    "            [fst_cos_sim, avg_cos_sim, bow_cos_sim, \n",
+    "               neg_path_cos_sim, hedge_path_cos_sim, \n",
+    "               cos_sim_s, cos_sim_v, cos_sim_o, nq_h, nq_b] + \n",
+    "            headline_sent + diff_sents + root_dist_feats + \n",
+    "            list(headline_neg_ancestors[2:]) + list(np.sum(summary_neg_counts, axis = 0))\n",
+    "        )\n",
+    "        features.append(fts)\n",
+    "        actual.append(s)\n",
+    "    end = time.time()\n",
+    "    print(int(end-start))\n",
+    "    return features, actual"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 211,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_features_nn(stance_df, n_sent = 5):\n",
+    "    start = time.time()\n",
+    "    data = list(stance_df.values)\n",
+    "    features = []\n",
+    "    actual = []\n",
+    "    for item in data:\n",
+    "        h, b, s = tuple(item)\n",
+    "        headline, headline_graph, headline_subjs, headline_svo, headline_root_dist, headline_neg_ancestors, nq_h  = headline_info[h]\n",
+    "        body, body_graph, nq_b = body_info[b]\n",
+    "        \n",
+    "        #sometimes the coref deletes bodies that are one sentence\n",
+    "        if len(body) == 0:\n",
+    "            body = nlp(preprocess(get_body(b)))\n",
+    "            body_graph = build_graph(body)\n",
+    "\n",
+    "        #return the shortest path to negating word for each subject in headline_subjs, if one exists\n",
+    "        neg_h = get_shortest_path_to_negating(headline_graph, headline_subjs)\n",
+    "        neg_b = get_shortest_path_to_negating(body_graph, headline_subjs)\n",
+    "\n",
+    "        #body summary\n",
+    "        summary = get_summary(body, headline_subjs, n_sent)\n",
+    "        first_summ_sentence = summary[0]\n",
+    "        \n",
+    "        summary_svos = [get_svos(s) for s in summary]\n",
+    "        summary_root_dist = [root_distance(body_graph, list(s[1].keys())[0]) for s in summary_svos]\n",
+    "        summary_neg_ancestors = [get_neg_ancestors(s) for s in summary]\n",
+    "        summary_neg_counts = [s[2:] for s in summary_neg_ancestors]\n",
+    "        \n",
+    "        #svo\n",
+    "        body_s, body_v, body_o = {}, {}, {}\n",
+    "        headline_s, headline_v, headline_o = headline_svo\n",
+    "        for svo in summary_svos:\n",
+    "            body_s.update(svo[0])\n",
+    "            body_v.update(svo[1])\n",
+    "            body_o.update(svo[2])\n",
+    "        body_s_vec = list(np.mean([body_s[s].vector for s in body_s], axis = 0)) if len(body_s) > 0 else np.zeros(384)\n",
+    "        body_v_vec = list(np.mean([body_v[s].vector for s in body_v], axis = 0)) if len(body_v) > 0 else np.zeros(384)\n",
+    "        body_o_vec = list(np.mean([body_o[s].vector for s in body_o], axis = 0)) if len(body_o) > 0 else np.zeros(384)\n",
+    "    \n",
+    "        headline_s_vec = list(np.mean([headline_s[s].vector for s in headline_s], axis = 0)) if len(headline_s) > 0 else np.zeros(384)\n",
+    "        headline_v_vec = list(np.mean([headline_v[s].vector for s in headline_v], axis = 0)) if len(headline_v) > 0 else np.zeros(384)\n",
+    "        headline_o_vec = list(np.mean([headline_o[s].vector for s in headline_o], axis = 0)) if len(headline_o) > 0 else np.zeros(384)\n",
+    "        \n",
+    "        cos_sim_s = cosine_similarity(body_s_vec, headline_s_vec)\n",
+    "        cos_sim_v = cosine_similarity(body_v_vec, headline_v_vec)\n",
+    "        cos_sim_o = cosine_similarity(body_o_vec, headline_o_vec)\n",
+    "        \n",
+    "        #negating paths\n",
+    "        headline_paths = [neg_h[x] for x in neg_h]\n",
+    "        headline_neg_paths = [1 if x[0] != None else 0 for x in headline_paths] + [1]\n",
+    "        headline_hedge_paths = [1 if x[1] != None else 0 for x in headline_paths] + [1]\n",
+    "        body_paths = [neg_h[x] for x in neg_h]\n",
+    "        body_neg_paths = [1 if x[0] != None else 0 for x in body_paths] + [1]\n",
+    "        body_hedge_paths = [1 if x[1] != None else 0 for x in body_paths] + [1]\n",
+    "        \n",
+    "        neg_path_cos_sim = cosine_similarity(headline_neg_paths, body_neg_paths)\n",
+    "        hedge_path_cos_sim = cosine_similarity(headline_hedge_paths, body_hedge_paths)\n",
+    "        \n",
+    "        #root distance\n",
+    "        avg_summary_root_dist = None\n",
+    "        non_null = [x for x in summary_root_dist if x != None]\n",
+    "        if len(non_null) != 0:\n",
+    "            avg_summary_root_dist = sum(non_null)/len(non_null)\n",
+    "        root_dist_feats = [headline_root_dist, avg_summary_root_dist]\n",
+    "        root_dist_feats = [x if x != None else 100 for x in root_dist_feats]\n",
+    "    \n",
+    "        #sentiment\n",
+    "        headline_sent = get_sentiment(headline)\n",
+    "        body_sents = [get_sentiment(s) for s in summary]\n",
+    "        diff_sents = list(np.sum([get_diff_sentiment(headline_sent, s) for s in body_sents], axis = 0))\n",
+    "        \n",
+    "        #bow\n",
+    "        headline_vocab = set([tok.lemma_.lower() for tok in headline])\n",
+    "        fst_summ_vocab = set([tok.lemma_.lower() for tok in first_summ_sentence])\n",
+    "        total_vocab = list(headline_vocab.union(fst_summ_vocab))\n",
+    "        headline_embedding = [1 if tok in headline_vocab else 0 for tok in total_vocab]\n",
+    "        fst_summ_embedding = [1 if tok in fst_summ_vocab else 0 for tok in total_vocab]\n",
+    "        bow_cos_sim = cosine_similarity(headline_embedding, fst_summ_embedding)\n",
+    "        \n",
+    "        #word vecs\n",
+    "        cos_sims = [cosine_similarity(s.vector, headline.vector) for s in summary]\n",
+    "        fst_cos_sim = cos_sims[0]\n",
+    "        avg_cos_sim = sum(cos_sims)/len(cos_sims)\n",
+    "        \n",
+    "        #build final features list\n",
+    "        fts = (\n",
+    "            [fst_cos_sim, avg_cos_sim, bow_cos_sim, \n",
+    "               neg_path_cos_sim, hedge_path_cos_sim, \n",
+    "               cos_sim_s, cos_sim_v, cos_sim_o, nq_h, nq_b] + \n",
+    "            headline_sent + diff_sents + root_dist_feats + \n",
+    "            list(headline_neg_ancestors[2:]) + list(np.sum(summary_neg_counts, axis = 0))\n",
+    "        )\n",
+    "        \n",
+    "        #word vectors\n",
+    "        headline_vecs = []\n",
+    "        body_vecs = []\n",
+    "        word_sets = [negating_words, doubting_words, hedging_words]\n",
+    "        for tok in nlp_h:\n",
+    "            vec = np.concatenate(\n",
+    "                (tok.vector,\n",
+    "                 [1 if root_distance(headline_graph, tok.lemma_.lower()) != None else 0],\n",
+    "                 [int(tok.lemma_.lower() in ws) for ws in word_sets],\n",
+    "                 [int(any([(ancestor.lemma_.lower() in ws) for ancestor in tok.ancestors])) for ws in word_sets],\n",
+    "                 [int(any([(child.lemma_.lower() in ws) for child in tok.children])) for ws in word_sets],\n",
+    "                 get_sentiment(tok)), axis = 0)\n",
+    "            headline_vecs.append(vec)\n",
+    "            \n",
+    "        for s_id in range(len(summary)):\n",
+    "            sentence = summary[s_id] \n",
+    "            for stok in sentence:\n",
+    "                vec = np.concatenate(\n",
+    "                    (stok.vector, \n",
+    "                     [1 if root_distance(body_graph, stok.lemma_.lower()) != None else 0],\n",
+    "                     [int(stok.lemma_.lower() in ws) for ws in word_sets],\n",
+    "                     [int(any([(ancestor.lemma_.lower() in ws) for ancestor in stok.ancestors])) for ws in word_sets],\n",
+    "                     [int(any([(child.lemma_.lower() in ws) for child in stok.children])) for ws in word_sets],\n",
+    "                     get_sentiment(stok)), axis = 0)\n",
+    "                body_vecs.append(vec)\n",
+    "        \n",
+    "        #padd/concat to proper length\n",
+    "        wvlen = np.size(headline_vecs[0])\n",
+    "        if len(headline_vecs) < 25:\n",
+    "            headline_vecs = headline_vecs + [np.zeros(wvlen)]*(25 - len(headline_vecs))\n",
+    "        if len(body_vecs) < 75:\n",
+    "            body_vecs += [np.zeros(wvlen)]*(75 - len(body_vecs))\n",
+    "        headline_vecs = headline_vecs[:25]\n",
+    "        body_vecs = body_vecs[:75]\n",
+    "        \n",
+    "        features.append((headline_vecs + body_vecs, np.nan_to_num(fts)))\n",
+    "        actual.append(s)\n",
+    "    end = time.time()\n",
+    "    print(int(end-start))\n",
+    "    return features, actual"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 216,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/dannyyang/Library/Python/3.6/lib/python/site-packages/scipy/spatial/distance.py:505: RuntimeWarning: invalid value encountered in double_scalars\n",
+      "  dist = 1.0 - np.dot(u, v) / (norm(u) * norm(v))\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "330\n",
+      "76\n"
+     ]
+    }
+   ],
+   "source": [
+    "training_data = get_features_nn(stances_tr, 5)\n",
+    "testing_data = get_features_nn(stances_val, 5)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 181,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# for i in range(30):\n",
+    "#     print(np.size(training_data[0][i][0]))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 135,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# for i in range(len(training_data[0][0])):\n",
+    "#     r = []\n",
+    "#     for row in training_data[0]:\n",
+    "#         r.append(row[i])\n",
+    "#     print(r[:25])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 145,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "training_data = [np.nan_to_num(x) for x in training_data[0]], training_data[1]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 150,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Counter({'discuss': 7167, 'agree': 5744, 'disagree': 4718}) Counter({'discuss': 1742, 'agree': 806, 'disagree': 166})\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(Counter(training_data[1]), Counter(testing_data[1]))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 96,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "0.6418570375829035\n"
+     ]
+    }
+   ],
+   "source": [
+    "c = Counter(testing_data[1])\n",
+    "baseline = c['discuss']/(c['agree']+c['disagree']+c['discuss'])\n",
+    "print(baseline)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# SIMPLE MODELS"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 149,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',\n",
+       "            max_depth=8, max_features='auto', max_leaf_nodes=None,\n",
+       "            min_impurity_decrease=0.0, min_impurity_split=None,\n",
+       "            min_samples_leaf=1, min_samples_split=2,\n",
+       "            min_weight_fraction_leaf=0.0, n_estimators=250, n_jobs=1,\n",
+       "            oob_score=False, random_state=None, verbose=0,\n",
+       "            warm_start=False)"
+      ]
+     },
+     "execution_count": 149,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "from sklearn.linear_model import LogisticRegression\n",
+    "from sklearn.ensemble import RandomForestClassifier\n",
+    "from sklearn.tree import DecisionTreeClassifier\n",
+    "from sklearn.svm import SVC\n",
+    "model = RandomForestClassifier(max_depth = 8 , n_estimators=250)\n",
+    "# model = LogisticRegression(max_iter = 200)\n",
+    "# model = SVC()\n",
+    "model.fit(training_data[0], training_data[1])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 151,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "76.24% training accuracy\n",
+      "68.72% validation accuracy\n",
+      "Baseline comparison: 4.53%\n"
+     ]
+    }
+   ],
+   "source": [
+    "tr_acc = model.score(training_data[0], training_data[1])\n",
+    "print('{0:.2f}% training accuracy'.format(tr_acc*100))\n",
+    "val_acc = model.score(testing_data[0], testing_data[1])\n",
+    "print('{0:.2f}% validation accuracy'.format(val_acc*100))\n",
+    "print(\"Baseline comparison: {0:.2f}%\".format((val_acc-baseline)*100))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "metadata": {},
+   "outputs": [
+    {
+     "ename": "AttributeError",
+     "evalue": "'RandomForestClassifier' object has no attribute 'coef_'",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[0;31mAttributeError\u001b[0m                            Traceback (most recent call last)",
+      "\u001b[0;32m<ipython-input-31-5d7d16af431f>\u001b[0m in \u001b[0;36m<module>\u001b[0;34m()\u001b[0m\n\u001b[0;32m----> 1\u001b[0;31m \u001b[0mprint\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mmodel\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mclasses_\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mmodel\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mcoef_\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m",
+      "\u001b[0;31mAttributeError\u001b[0m: 'RandomForestClassifier' object has no attribute 'coef_'"
+     ]
+    }
+   ],
+   "source": [
+    "print(model.classes_, model.coef_)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Neural Nets"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 217,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "class MLP(nn.Module):\n",
+    "    def __init__(self, input_dim, hidden_dim, output_dim, dropout):\n",
+    "        \"\"\"\n",
+    "        Args:\n",
+    "            input_dim (int): the size of the input vectors\n",
+    "            hidden_dim (int): the output size of the first Linear layer\n",
+    "            output_dim (int): the output size of the second Linear layer\n",
+    "        \"\"\"\n",
+    "        super(MLP, self).__init__()\n",
+    "        self.fc1 = nn.Linear(input_dim, hidden_dim)\n",
+    "        self.fc2 = nn.Linear(hidden_dim, output_dim)\n",
+    "        self.dropout = nn.Dropout(dropout)\n",
+    "\n",
+    "    def forward(self, x_in, apply_softmax=False):\n",
+    "        \"\"\"The forward pass of the MLP\n",
+    "        \n",
+    "        Args:\n",
+    "            x_in (torch.Tensor): an input data tensor \n",
+    "                x_in.shape should be (batch, input_dim)\n",
+    "            apply_softmax (bool): a flag for the softmax activation\n",
+    "                should be false if used with the cross-entropy losses\n",
+    "        Returns:\n",
+    "            the resulting tensor. tensor.shape should be (batch, output_dim)\n",
+    "        \"\"\"\n",
+    "        intermediate = F.relu(self.fc1(x_in))\n",
+    "        output = self.fc2(self.dropout(intermediate))\n",
+    "        return output"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 218,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "class GRU(nn.Module):\n",
+    "    def __init__(self, embedding_dim, hidden_dim, output_dim, dropout):\n",
+    "        super().__init__()\n",
+    "        \n",
+    "        self.rnn = nn.GRU(embedding_dim, hidden_dim, num_layers=1, bidirectional=True)\n",
+    "        self.fc = nn.Linear(hidden_dim*2, hidden_dim)\n",
+    "        self.fc2 = nn.Linear(hidden_dim, output_dim)\n",
+    "        self.dropout = nn.Dropout(dropout)\n",
+    "        \n",
+    "    def forward(self, x):\n",
+    "        output, hidden = self.rnn(x)# np.array(x[0], dtype = \"float\"))\n",
+    "        hidden = self.dropout(torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1))\n",
+    "        fc = self.fc(hidden.squeeze(0))\n",
+    "        fc2 = self.fc2(F.relu(fc))\n",
+    "        return fc2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 219,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "EMBEDDING_DIM = np.size(training_data[0][0][0][0]) # len(training_data[0][0])\n",
+    "HIDDEN_DIM = 200 # int(EMBEDDING_DIM/2)\n",
+    "OUTPUT_DIM = 3\n",
+    "DROPOUT = 0.3\n",
+    "num_epochs = 10\n",
+    "batch_size = 1000"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 220,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "batches_train= int(len(training_data[1])/batch_size)\n",
+    "batches_val = int(len(testing_data[1])/batch_size)\n",
+    "\n",
+    "mlp = GRU(EMBEDDING_DIM, HIDDEN_DIM, OUTPUT_DIM, DROPOUT)\n",
+    "optimizer = torch.optim.Adam(mlp.parameters(), lr=5e-5)\n",
+    "criterion = criterion = nn.CrossEntropyLoss()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
+    "start = time.time()\n",
+    "for epoch in range(num_epochs):\n",
+    "\n",
+    "    train_loss, train_acc = train(mlp, batches_train, optimizer, criterion, training_data)\n",
+    "    valid_loss, valid_acc = evaluate(mlp, batches_val, criterion, testing_data)\n",
+    "\n",
+    "    print(f'| Epoch: {epoch+1:02} | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {valid_loss:.3f} | Val. Acc: {valid_acc*100:.2f}% |')\n",
+    "end = time.time()\n",
+    "print(int(end-start))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 237,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Accuracy: 64 %\n"
+     ]
+    }
+   ],
+   "source": [
+    "# eval mlp\n",
+    "# predicted = eval_model(mlp, testing_data)\n",
+    "# predicted = [(\"agree\" if x == 2 else (\"discuss\" if x == 1 else \"disagree\")) for x in predicted]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 234,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "actual = testing_data[1]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 157,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "actual = testing_data[1]\n",
+    "predicted = model.predict(testing_data[0])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 238,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "-------------------------------------------------------------\n",
+      "|           |   agree   | disagree  |  discuss  | unrelated |\n",
+      "-------------------------------------------------------------\n",
+      "|   agree   |     0     |     0     |    806    |     0     |\n",
+      "-------------------------------------------------------------\n",
+      "| disagree  |     0     |     0     |    166    |     0     |\n",
+      "-------------------------------------------------------------\n",
+      "|  discuss  |     0     |     0     |   1742    |     0     |\n",
+      "-------------------------------------------------------------\n",
+      "| unrelated |     0     |     0     |     0     |     0     |\n",
+      "-------------------------------------------------------------\n",
+      "Score: 1985.0 out of 2714.0\t(73.13927781871776%)\n",
+      "Normalized confusion matrix\n",
+      "[[0. 0. 1.]\n",
+      " [0. 0. 1.]\n",
+      " [0. 0. 1.]]\n"
+     ]
+    },
+    {
+     "data": {
+      "image/png": "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\nZDahEwMAS8UAAAAASUVORK5CYII=\n",
+      "text/plain": [
+       "<matplotlib.figure.Figure at 0x1c3c5a6a0>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "sc.report_score(actual, predicted)\n",
+    "matrix = confusion_matrix(actual,predicted)\n",
+    "plot_confusion_matrix(matrix, classes=[\"agree\",\"disagree\", \"discuss\"],\n",
+    "                      title='Normalized confusion matrix')\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.6.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
