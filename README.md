@@ -1,6 +1,9 @@
 # Insights-FakeNews
 
-<i>James Chen, Max Chen, Shalin Mehta, Brandon Truong, Danny Yang</i>
+<i>Current Members: Danny Yang, Linnea May, Eric Sun, Kathy Byun</i>
+
+
+<i>Fall 2018 Members: James Chen, Max Chen, Shalin Mehta, Brandon Truong, Danny Yang</i>
 
 People will <i>never</i> stop talking about the 2016 election. While we will never know the actual extent of the effect of fake news, the least we can do is try to classify articles as fake news or real, with the hope of stopping the spread of misinformation.
 
