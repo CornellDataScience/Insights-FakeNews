@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/*
+.ipynb_checkpoints/*
+word_embeddings/glove*.txt
+word_embeddings/glove*.dat
+word_embeddings/glove*.pkl
+<<<<<<< HEAD
+brandon_vis/*
+=======
+training_data.pkl
+testing_data.pkl
+neuralcoref/*
+>>>>>>> 3c98e0ff0c240dcebcb1c061d4f0f4ac179ffa16

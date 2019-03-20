@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/*
+.ipynb_checkpoints/*
+word_embeddings/glove*.txt
+word_embeddings/glove*.dat
+word_embeddings/glove*.pkl
+training_data.pkl
+testing_data.pkl
+neuralcoref/*
