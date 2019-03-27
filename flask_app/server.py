@@ -84,5 +84,6 @@ def classify_helper(headline, bodies):
         "relevance_features": {
             "headline": headline_processed,
             "bodies": body_info_rel
-        }
+        },
+        "predictions": predicted
     }
