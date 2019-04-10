@@ -18,7 +18,7 @@ def classify_multiple():
         bodies.loc[lambda x: x["Body ID"] == n, "articleBody"].item()
     relevant_stances = stances[stances["Headline"]==headline]
     relevant_bodies = [get_body(i[1]) for i in relevant_stances.values()]
-    results = classify_helper(headline, bodies)
+    results = classify_helper(headline, relevant_bodies)
     return jsonify(results)
 
 @app.route('/classify', methods = ['POST'])
@@ -29,7 +29,7 @@ def classify():
     return jsonify(results)
 
 @app.route('/classify_test', methods = ['POST'])
-def classify():
+def classify_test():
     headline = ""
     body = ""
     results = classifiy_helper(headline, [body])
