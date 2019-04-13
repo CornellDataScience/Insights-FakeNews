@@ -1,0 +1,61 @@
+<html>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+
+<body>
+</body>
+<script>
+    var width = window.innerWidth,
+        height = window.innerHeight * 1.5;
+    var svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
+
+    function drawDepTree(data, offset) {
+        var vis = svg.append("g").attr("transform", `translate (0, ${20 + offset * height/6})`)
+        var treemap = d3.tree().size([width, height / 6 - 20]);
+        var root = d3.hierarchy(data, (d) => d.children);
+        var treemap = treemap(root);
+        var nodes = treemap;
+        var links = treemap.descendants().slice(1);
+
+        vis.selectAll(".link")
+            .data(links)
+            .enter().append("path")
+            .attr("class", "link")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("d", function (d) {
+                return "M" + d.x + "," + d.y +
+                    "C" + d.x + "," + (d.y + d.parent.y) / 2 +
+                    " " + d.parent.x + "," + (d.y + d.parent.y) / 2 +
+                    " " + d.parent.x + "," + d.parent.y;
+            });
+
+        var node = vis.selectAll(".node")
+            .data(nodes.descendants())
+            .enter()
+            .append("g");
+
+        node.append("circle")
+            .attr("class", "node")
+            .attr("fill", "silver")
+            .attr("r", 4.5)
+            .attr("cx", (d) => d.x)
+            .attr("cy", (d) => d.y);
+
+
+        node.append("text")
+            .text((d) => d.data.token)
+            .attr("x", (d) => d.x)
+            .attr("dx", 5)
+            .attr("y", (d) => d.y);
+    }
+
+    d3.json("test_deps_tree.json").then((json) => {
+        var data = json.body;
+        data.unshift(json.headline);
+        data.forEach((d,i) => {
+            drawDepTree(d, i);
+        });
+    });
+</script>
+
+</html>
