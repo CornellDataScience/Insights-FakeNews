@@ -1,0 +1,48 @@
+<html>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <style>
+    /* Add your CSS styles here! */
+    </style>
+    <body>
+    <script>
+        // TODO: add color scale
+        d3.json("acitvations_LSTM.json", function(data){
+            let cell = data[0]; // work with just one cell for now
+            console.log(cell["headline"]);
+
+            let headlines = cell["headline"]; 
+
+            headlines.forEach(function(d,i){
+                let key = Object.keys(d)[0];
+                let value = Number(Object.values(d)[0]);
+
+                console.log(key, value);
+
+                d[key] = value;
+            });
+
+            console.log(headlines);
+
+            let headline_container = d3.select("body").append("div")
+                    .attr("class", "headline");
+
+            headlines.forEach(function(d,i){
+                var key = Object.keys(d)[0];
+                var value = Number(Object.values(d)[0]);
+
+                // Append the word for element d onto headline_container
+                headline_container.append("span")
+                    .attr("T", i) // The index of the current word in the headline
+                    .text(key)
+                    .style("background-color", color_scale(value));
+                
+                // Add a space between each word
+                headline.append("span").text(" ");
+            })
+
+            // TODO: Do similar thing for body
+
+        })
+    </script>
+    </body>
+</html>
