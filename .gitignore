@@ -5,3 +5,4 @@ word_embeddings/glove*.txt
 word_embeddings/glove*.dat
 word_embeddings/glove*.pkl
 brandon_vis/*
+flask_app/venv/

@@ -4,6 +4,28 @@
 <body>
 </body>
 <script>
+    let negating_words = [
+        "n't", "not", "no", 
+        "never", "nobody", "non", "nope"];
+    let doubting_words = [
+        'fake','fraud', 'hoax', 
+        'false', 'deny', 'denies', 
+        'despite', 'doubt', 
+        'bogus', 'debunk', 'prank', 
+        'retract', 'scam', "withdrawn",
+        "misinformation"];
+    let hedging_words = [
+        'allege', 'allegedly','apparently',
+        'appear','claim','could',
+        'evidently','largely','likely',
+        'mainly','may', 'maybe', 'might',
+        'mostly','perhaps','presumably',
+        'probably','purport', 'purportedly',
+        'reported', 'reportedly',
+        'rumor', 'rumour', 'rumored', 'rumoured',
+        'says','seem','somewhat',
+        'unconfirmed'];
+
     var width = window.innerWidth,
         height = window.innerHeight * 1.5;
     var svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
@@ -36,7 +58,18 @@
 
         node.append("circle")
             .attr("class", "node")
-            .attr("fill", "silver")
+            .attr("fill", function(d){
+                console.log(d);
+                let token = d.data.token;
+                if(negating_words.includes(token)){
+                    return "red";
+                } else if(doubting_words.includes(token)){
+                    return "orange";
+                } else if(hedging_words.includes(token)){
+                    return "green";
+                }
+                return "silver";
+            })
             .attr("r", 4.5)
             .attr("cx", (d) => d.x)
             .attr("cy", (d) => d.y);
