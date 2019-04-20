@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+
 import numpy as np
 import pandas as pd
 import spacy

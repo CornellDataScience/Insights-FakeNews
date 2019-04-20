@@ -1,6 +1,612 @@
 <html>
-    <body>
-        <script src = "{{ url_for('static', filename='main.js') }}"></script>
-        <h1>Hello, World!</h1>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.0/jquery.min.js'></script>
+
+<head>
+    <style>
+        h1 {
+            font-weight: 200;
+            font-family: verdana;
+            text-align: center
+        }
+
+        text {
+            font-family: "Gill Sans"
+        }
+
+        span {
+            font-family: "Gill Sans"
+        }
+
+        .autocomplete {
+            position: relative;
+            display: inline-block;
+        }
+
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+        }
+
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            background-color: white;
+            border-bottom: 1px solid #d4d4d4;
+        }
+
+        .autocomplete-items div:hover {
+            background-color: #e9e9e9;
+        }
+
+        .autocomplete-active {
+            background-color: DodgerBlue !important;
+            color: #ffffff;
+        }
+
+        .card {
+            padding: 20;
+            border: none;
+        }
+    </style>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+
+<body>
+        <div class="card centered" width = "400" height = "700">
+            <h1>CDS Insights - Fake News Project - Relevance Detection
+            Visualization</h1> 
+            <div class = "row justify-content-center">
+                <div class = "card text-center" width = 400>Type in an article headline to look up all the article bodies paired
+                with that headline, or choose 5 random article/headline pairs. This
+                visualization displays the features we used in our algorithm to predict
+                relevance, which is the cosine similarity values of the first and most
+                significant sentence compared to the article headline. </div>
+            </div>
+        </div>
+        <div id="all">
+        </div>
     </body>
+<script>
+    function jsonEscape(str) {
+        return str.replace(/\n/g, "\\\\n").replace(/\r/g, "\\\\r").replace(/\t/g, "\\\\t");
+    }
+    var response = JSON.parse(jsonEscape('{{ data | tojson | safe }}'));
+
+    let width = 1000,
+        height = 500;
+
+    let type_words = ["nouns", "verbs", "adjectives", "adverbs", "first sentence", "significant sentence", "normal"];
+    let colors = ["indianred", "royalblue", "teal", "deeppink", "yellow", "lawngreen", "black"];
+    //[#CD5C5C, #4169E1, #008080, #FF1493, #FFFF00, #7CFC00]
+
+    var headline_names = [];
+    var headline_id = {};
+
+    //prereq: color2 is either yellow or lawngreen, color1 is one of the first 4 colors
+    function blend_color(color1, color2) {
+        if (color1 === colors[0] && color2 === colors[4]) {
+            return "#e4a533";
+        } else if (color1 === colors[1] && color2 === colors[4]) {
+            return "#96ac7c";
+        } else if (color1 === colors[2] && color2 === colors[4]) {
+            return "#73b946";
+        } else if (color1 === colors[3] && color2 === colors[4]) {
+            return "#ff7e51"
+        } else if (color1 === colors[0] && color2 === colors[5]) {
+            return "#a9a433";
+        } else if (color1 === colors[1] && color2 === colors[5]) {
+            return "#5cab7c";
+        } else if (color1 === colors[2] && color2 === colors[5]) {
+            return "#3ebe40";
+        } else if (color1 === colors[3] && color2 === colors[5]) {
+            return "#c47c51";
+        } else if ((color1 === colors[4] && color2 === colors[5]) || (color1 === colors[5] && color2 === colors[4])) {
+            return "#befe00";
+        }
+    }
+
+    function class_to_color(class_id) {
+        switch (class_id) {
+            case "noun":
+                return colors[0];
+                break;
+            case "verb":
+                return colors[1];
+                break;
+            case "adj":
+                return colors[2];
+                break;
+            case "adv":
+                return colors[3];
+                break;
+            case "first":
+                return colors[4];
+                break;
+            case "sig":
+                return colors[5];
+                break;
+            case "firstsig":
+                return blend_color(colors[4], colors[5]);
+            case "firstnoun":
+                return blend_color(colors[0], colors[4]);
+                break;
+            case "firstverb":
+                return blend_color(colors[1], colors[4]);
+                break;
+            case "firstadj":
+                return blend_color(colors[2], colors[4]);
+                break;
+            case "firstadv":
+                return blend_color(colors[3], colors[4]);
+                break;
+            case "signoun":
+                return blend_color(colors[0], colors[5]);
+                break;
+            case "sigverb":
+                return blend_color(colors[1], colors[5]);
+                break;
+            case "sigadj":
+                return blend_color(colors[2], colors[5]);
+                break;
+            case "sigadv":
+                return blend_color(colors[3], colors[5]);
+                break;
+            case "firstsignoun":
+                return blend_color(colors[0], colors[4]);
+                break;
+            case "firstsigverb":
+                return blend_color(colors[1], colors[4]);
+                break;
+            case "firstsigadj":
+                return blend_color(colors[2], colors[4]);
+                break;
+            case "firstsigadv":
+                return blend_color(colors[3], colors[4]);
+                break;
+            default:
+                break;
+        }
+        return "white";
+    }
+
+    //classes can be combination of 3 words: first, sig, and type of word
+    function making_class(word, head, sig_sent, first_sent) {
+        let value = "";
+        let nouns = head.nouns;
+        let verbs = head.verbs;
+        let adjs = head.adjectives;
+        let advs = head.adverbs;
+        let word_lower = word.toLowerCase();
+        word_lower = word_lower.replace(/[^A-za-z0-9]/g, "");
+        word_lower = word_lower.replace(/(\'s)$/, "");
+        if (word_lower.substring(word_lower.length - 1) === "s") {
+            word_lower_s = word_lower.substring(0, word_lower.length - 1);
+            word_lower_d = word_lower_s + "d";
+        } else if (word_lower.substring(word_lower.length - 1) === "d") {
+            word_lower_d = word_lower.substring(0, word_lower.length - 1);
+            word_lower_s = word_lower_d + "s";
+        } else {
+            word_lower_d = word_lower;
+            word_lower_s = word_lower;
+        }
+
+        if (first_sent) {
+            value = value + "first";
+        }
+        if (sig_sent) {
+            value = value + "sig";
+        }
+
+        if (nouns.includes(word_lower) || nouns.includes(word_lower_s) || nouns.includes(word_lower_d)) {
+            value = value + "noun";
+        } else if (verbs.includes(word_lower) || verbs.includes(word_lower_s) || verbs.includes(word_lower_d)) {
+            value = value + "verb";
+        } else if (adjs.includes(word_lower) || adjs.includes(word_lower_s) || nouns.includes(word_lower_d)) {
+            value = value + "adj";
+        } else if (advs.includes(word_lower) || advs.includes(word_lower_s) || nouns.includes(word_lower_d)) {
+            value = value + "adv";
+        }
+        return value;
+    }
+
+    //during mouseover when selecting opacity, changes the opacity of words
+    function select_class_opacity(text, class_word) {
+        if (class_word === "first") {
+            text.selectAll(".first").style("opacity", 1);
+            text.selectAll(".firstnoun").style("opacity", 1);
+            text.selectAll(".firstverb").style("opacity", 1);
+            text.selectAll(".firstadj").style("opacity", 1);
+            text.selectAll(".firstadv").style("opacity", 1);
+            text.selectAll(".firstsig").style("opacity", 1);
+            text.selectAll(".firstsignoun").style("opacity", 1);
+            text.selectAll(".firstsigverb").style("opacity", 1);
+            text.selectAll(".firstsigadj").style("opacity", 1);
+            text.selectAll(".firstsigadv").style("opacity", 1);
+        } else if (class_word === "sig") {
+            text.selectAll(".sig").style("opacity", 1);
+            text.selectAll(".signoun").style("opacity", 1);
+            text.selectAll(".sigverb").style("opacity", 1);
+            text.selectAll(".sigadj").style("opacity", 1);
+            text.selectAll(".sigadv").style("opacity", 1);
+            text.selectAll(".firstsig").style("opacity", 1);
+            text.selectAll(".firstsignoun").style("opacity", 1);
+            text.selectAll(".firstsigverb").style("opacity", 1);
+            text.selectAll(".firstsigadj").style("opacity", 1);
+            text.selectAll(".firstsigadv").style("opacity", 1);
+        } else {
+            text.selectAll("." + class_word).style("opacity", 1);
+            text.selectAll(".first" + class_word).style("opacity", 1);
+            text.selectAll(".sig" + class_word).style("opacity", 1);
+            text.selectAll(".firstsig" + class_word).style("opacity", 1);
+        }
+    }
+
+//custom cosine_sim function for bag of words
+    function cosine_sim(a,b){
+        var vocab = [...new Set(a.concat(b))];
+        var vocab_A = new Set(a);
+        var vocab_B = new Set(b);
+
+        var VA = vocab.map((e) => vocab_A.has(e) ? 1 : 0);
+        var VB = vocab.map((e) => vocab_B.has(e) ? 1 : 0);
+
+        var dotproduct=0;
+        var mA=0;
+        var mB=0;
+        for(i = 0; i < VA.length; i++){
+            dotproduct += (VB[i]*VA[i]);
+            mA += VA[i];
+            mB += VB[i];
+        }
+        mA = Math.sqrt(mA);
+        mB = Math.sqrt(mB);
+        var similarity = (dotproduct)/((mA)*(mB))
+        return similarity;
+    }
+
+    body_info(response);
+
+    //function that runs data
+    function body_info(response) {
+        console.log(response)
+        var bodies_raw = response.bodies;
+        var headline_raw = response.headline;
+        var results = response.predictions;
+        var graphs = response.graphs;
+        var relevance_fts = response.relevance_features;
+        var headline = relevance_fts.headline;
+        var bodies = relevance_fts.bodies;
+        //cleaning body text data
+        for (let i = 0; i < 5000; i++) {
+            if (bodies[i] != undefined) { //if element exists
+                let ele = bodies[i];
+                ele.raw = bodies_raw[i].replace("\\n", "").replace("\\n", "");
+                let sentences = ele.raw.split(".");
+                let words = ele.raw.split(/(\s+)/); //raw split by space
+                ele["sentences"] = sentences;
+                ele["words"] = words;
+            }
+        }
+
+        //cleaning headline data
+        headline.raw = headline_raw.replace("\\n", "").replace("\\n", "");
+        let raw = headline.raw.replace(/-/g, " ");
+        let words = raw.split(/(\s)/g);
+        headline["words"] = words;
+
+        let headline_data = headline;
+
+        d3.selectAll("#all > *").remove();
+        for (var i = 0; i < bodies.length; i++) {
+            let index = i;
+            let head = headline_data;
+            let body = bodies[i];
+            displayHead(head, body, index);
+            displayFeatures(head, body, index)
+        }
+
+        function displayHead(head, body, index) { //displaying headline
+            let article = d3.select("#all").append("div")
+                .attr("class", "container").attr("id", `article${index}`);
+            let headline = article.append("div")
+                .attr("class", "headline");
+            head.words.forEach(function (word, i) {
+                let span_class = making_class(word, head, false, false);
+                headline.append("span")
+                    .attr("class", span_class)
+                    .text(head.words[i])
+                    .style("font-size", "40px")
+                    .style("background-color", function () {
+                        return class_to_color(span_class);
+                    })
+                    .on("mouseover", function () {
+                        console.log(head);
+                        console.log(body);
+                        //debug
+                    });
+                headline.append("span").text(" ").style("font-size", "40px");
+            });
+            headline.append("br");
+        }
+
+        //displays article text
+        function displayBody(head, body, index) { //Displaying the body
+            let article = d3.select(`#article${index}`);
+            let text = article.append("div")
+                .attr("id", `text${index}`)
+                .attr("class", "overflow-auto border border-secondary")
+                .style("height", function () {
+                    return Math.max(100, Math.min(450, body.raw.length / 15));
+                })
+                .style("overflow", "auto").style("display","none");
+
+            let first_sentence = body.first_sentence.raw;
+            let significant_sentence = body.significant_sentence.raw;
+            let firstsent_firstind = body.raw.indexOf(first_sentence);
+            let firstsent_lastind = firstsent_firstind + first_sentence.length;
+            let sigsent_firstind = body.raw.indexOf(significant_sentence);
+            let sigsent_lastind = body.raw.indexOf(significant_sentence) + significant_sentence.length;
+            let tracking_ind = 0;
+            body["sentences"].forEach(function (sent, i) { //iterate through all sentences
+                if (i !== body["sentences"].length - 1) {
+                    sent = sent + ".";
+                }
+
+                sent.split(/(\s+)/).forEach(function (word, i2) { //iterate through words in sentence
+                    // console.log(tracking_ind, firstsent_firstind, firstsent_lastind, sigsent_firstind, sigsent_lastind);
+                    let sig_sent = false;
+                    if (tracking_ind >= sigsent_firstind && tracking_ind <= sigsent_lastind) {
+                        sig_sent = true;
+                    }
+
+                    let first_sent = false;
+                    if (tracking_ind >= firstsent_firstind && tracking_ind <= firstsent_lastind) {
+                        first_sent = true;
+                    }
+
+                    tracking_ind = tracking_ind + word.length;
+                    let span_class = making_class(word, head, sig_sent, first_sent);
+                    let span_add = text.append("span")
+                        .attr("class", function () {
+                            return span_class;
+                        })
+                        .text(word)
+                        .style("background-color", function () {
+                            return class_to_color(span_class);
+                        });
+
+                    text.append("span").text(" ") //add space between words
+                        .attr("class", function () {
+                            if (span_class.indexOf("first") !== -1 && span_class.indexOf("sig") !==
+                                -1) {
+                                return "firstsig";
+                            } else if (span_class.indexOf("first") !== -1) {
+                                return "first";
+                            } else if (span_class.indexOf("sig") !== -1) {
+                                return "sig";
+                            }
+                        })
+                        .style("background-color", function () {
+                            if (span_class.indexOf("first") !== -1 && span_class.indexOf("sig") !==
+                                -1) {
+                                return blend_color(colors[4], colors[5]);
+                            } else if (span_class.indexOf("first") !== -1) {
+                                return colors[4];
+                            } else if (span_class.indexOf("sig") !== -1) {
+                                return colors[5];
+                            }
+                            return "white";
+                        });
+                })
+            })
+
+            let type_container = article.append("div").attr("class", "row text-center")
+                .attr("id", `type_words${index}`).style("display","none");
+            let button_group = type_container.append("div")
+                .attr("class", "btn-group btn-group-toggle")
+                .attr("data-toggle", "buttons")
+                .style("margin", "10 auto")
+                .style("display", "inline-block")
+                .style("text-align", "center");
+            type_words.forEach(function (d, i) {
+                button_group.append("button")
+                    .attr("type", "button")
+                    .attr("class", function () {
+                        if (i === 6) {
+                            return "btn btn-light border active";
+                        }
+                        return "btn border";
+                    })
+                    .text(d)
+                    .style("color", colors[i])
+                    .on("click", function () {
+                        button_group.selectAll(".btn").attr("class", "btn border");
+                        let word = d3.select(this);
+                        word.attr("class", "btn btn-light border active");
+                        let word_color = word.style("color");
+                        text.selectAll("span").style("opacity", 0.5);
+                        if (word_color === colors[0]) {
+                            select_class_opacity(text, "noun");
+                        } else if (word_color === colors[1]) {
+                            select_class_opacity(text, "verb");
+                        } else if (word_color === colors[2]) {
+                            select_class_opacity(text, "adj");
+                        } else if (word_color === colors[3]) {
+                            select_class_opacity(text, "adv");
+                        } else if (word_color === colors[4]) {
+                            select_class_opacity(text, "first");
+                        } else if (word_color === colors[5]) {
+                            select_class_opacity(text, "sig");
+                        } else if (word_color === colors[6]) {
+                            text.selectAll("span").style("opacity", 1);
+                        }
+                    });
+            });
+        }
+
+        //displaying first sentence and sig sent features
+        function displayFeatures(head, body, index) {
+            let article = d3.select(`#article${index}`);
+            let features = article.append("div")
+                .attr("class", "card centered");
+            let fir_sig = features.append("div")
+                .attr("class", "row justify-content-center")
+                .attr("id", "features");
+            let left = fir_sig.append("div")
+                .attr("class", "col-md-6")
+                .attr("id", "first");
+            let right = fir_sig.append("div")
+                .attr("class", "col-md-6")
+                .attr("id", "sig");
+            left.append("div").html("First Sentence of article: <br>");
+            right.append("div").html("Significant Sentence of article: <br>");
+
+            //first and significant sentence
+            let f_sent = body.first_sentence.raw;
+            let s_sent = body.significant_sentence.raw;
+
+            //getting counts of each token
+            let lcounts = [0, 0, 0, 0];
+            let rcounts = [0, 0, 0, 0];
+            //overflow boundaries for text
+            let ltext = left.append("div")
+                .attr("class", "overflow-auto border border-secondary")
+                .style("height", 60)
+                .style("overflow", "auto");
+            let rtext = right.append("div")
+                .attr("class", "overflow-auto border border-secondary")
+                .style("height", 60)
+                .style("overflow", "auto");
+
+            //iterating through text
+            f_sent.split(/(\s)/g).forEach(function (word) {
+                let span_class = making_class(word, head, false, true);
+                ltext.append("span")
+                    .attr("class", function () {
+                        if (span_class.includes("noun")) {
+                            lcounts[0] = lcounts[0] + 1;
+                        } else if (span_class.includes("verb")) {
+                            lcounts[1] = lcounts[1] + 1;
+                        } else if (span_class.includes("adj")) {
+                            lcounts[2] = lcounts[2] + 1;
+                        } else if (span_class.includes("adv")) {
+                            lcounts[3] = lcounts[3] + 1;
+                        }
+                        return span_class;
+                    })
+                    .style("background-color", class_to_color(span_class))
+                    .text(word);
+            })
+            s_sent.split(/(\s)/g).forEach(function (word) {
+                let span_class = making_class(word, head, true, false);
+                rtext.append("span")
+                    .attr("class", function () {
+                        if (span_class.includes("noun")) {
+                            rcounts[0] = rcounts[0] + 1;
+                        } else if (span_class.includes("verb")) {
+                            rcounts[1] = rcounts[1] + 1;
+                        } else if (span_class.includes("adj")) {
+                            rcounts[2] = rcounts[2] + 1;
+                        } else if (span_class.includes("adv")) {
+                            rcounts[3] = rcounts[3] + 1;
+                        }
+                        return span_class;
+                    })
+                    .style("background-color", class_to_color(span_class))
+                    .text(word);
+            })
+
+            cos_tokens_fst = cosine_sim(head.tokens, body.first_sentence.tokens)
+            cos_tokens_sig = cosine_sim(head.tokens, body.significant_sentence.tokens)
+
+            //cos simlarity values TODO fix the function
+            left.append("span").html("<br>First sentence cos similarity value: " + cos_tokens_fst.toFixed(2) +
+                "<br>");
+            right.append("span").html("<br>Significant sentence cos similarity value: " + cos_tokens_sig
+                .toFixed(2) + "<br>");
+
+            //svg elements
+            let svg_width = parseInt(left.style("width"), 10) - 20;
+            let svg_height = 40;
+            let left_svg = left.append("svg").attr("id", "left")
+                .attr("height", svg_height)
+                .attr("width", svg_width);
+            let right_svg = right.append("svg").attr("id", "right")
+                .attr("height", svg_height)
+                .attr("width", svg_width);
+
+            //percentage bar
+            left_svg.append("rect")
+                .attr("x", 0).attr("y", 0)
+                .attr("width", svg_width).attr("height", svg_height)
+                .style("fill", colors[4]);
+            right_svg.append("rect")
+                .attr("x", 0).attr("y", 0)
+                .attr("width", svg_width).attr("height", svg_height)
+                .style("fill", colors[5]);
+
+            //adding how much of percentage bar is filled
+            let x = 0;
+            const add = (a, b) => a + b;
+            let lsum = lcounts.reduce(add) === 0 ? 1 : lcounts.reduce(add);
+            let rsum = rcounts.reduce(add) === 0 ? 1 : rcounts.reduce(add);
+            lcounts.forEach(function (d, i) {
+                let width = svg_width * cos_tokens_fst.toFixed(2) * (d / lsum);
+                left_svg.append("rect")
+                    .attr("x", x).attr("y", 0)
+                    .attr("width", width).attr("height", svg_height)
+                    .style("fill", colors[i]);
+                x = x + width;
+            })
+            x = 0;
+            rcounts.forEach(function (d, i) {
+                let width = svg_width * cos_tokens_sig.toFixed(2) * (d / rsum);
+                right_svg.append("rect")
+                    .attr("x", x).attr("y", 0)
+                    .attr("width", width).attr("height", svg_height)
+                    .style("fill", colors[i]);
+                x = x + width;
+            })
+
+            features.append("row")
+                .attr("class", "row justify-content-center")
+                .append("span")
+                .attr("class", "text-center")
+                .html(`Our result: ${results[index]}<br>`);
+
+            features.append("div")
+                .attr("class", "btn-group text-center")
+                .attr("data-toggle", "buttons")
+                .style("margin", "10 auto")
+                .style("display", "inline-block")
+                .append("button")
+                .attr("type", "button")
+                .attr("class", "btn btn-light border my-2")
+                .text("Click to show/hide Article Body")
+                .on("click", function () {
+                    var txt = d3.select(`#text${index}`);
+                    var tw = d3.select(`#type_words${index}`);
+                    if (txt.style("display") == "none"){
+                        txt.style("display", "block");
+                        tw.style("display", "block");
+                    } else {
+                        txt.style("display", "none");
+                        tw.style("display", "none");
+                    }
+                });
+            
+            displayBody(head, body, index);
+        }
+    }
+</script>
+
 </html>
