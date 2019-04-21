@@ -42,6 +42,9 @@
         let nd_nodes = []; //negating/doubting words
         let curr_subjects = [];
 
+        
+
+ 
         //draw path from subject to negating node
         //neg_nodes is all negative nodes in tree, curr_subs is all current
         //subjects in the tree
@@ -97,6 +100,24 @@
                 .attr("stroke","red");
         }
 
+        //for each nd node, get siblings and ancestors. - number of overlap of things that are being negated - 
+        // all parents up to node and other children of that parent, and the number of overlap
+
+        function send_help(nd_nodes) {
+            //find all the children of primary parent
+            negate_to_root(nd_nodes);
+            nd_nodes.forEach(function(n){
+                parenting = n.parent;
+                childs = parenting.children;
+                childs.forEach(function(child){
+                    d3.select("#"+child.data.token+parenting.data.token+offset)
+                        .attr("stroke","red");
+                    d3.select("#"+child.data.token+parenting.data.idx+offset)
+                        .attr("stroke","red");
+                })
+        })
+        }
+
         vis.selectAll(".link")
             .data(links)
             .enter().append("path")
@@ -150,8 +171,10 @@
                 curr_subjects.push(d);
             }
         });
+
         negate_to_root(nd_nodes);
         neg_sub(nd_nodes, curr_subjects);
+        send_help(nd_nodes);
 
 
         node.append("text")
