@@ -42,37 +42,68 @@
         let nd_nodes = []; //negating/doubting words
         let curr_subjects = [];
 
-        //draw path from subject to negating node
-        //neg_nodes is all negative nodes in tree, curr_subs is all current
-        //subjects in the tree
-        function neg_sub(neg_nodes, curr_subs){
-            let paths = {}
+        //finds smallest path of sub/neg and returns the parent
+        function get_neg_sub(neg_nodes, curr_subs){
+            let min_par = "", min_neg = "", min_sub = "", min_path = Number.MAX_SAFE_INTEGER-1;
             curr_subs.forEach(function(sub){
-                paths[sub.token] = [];
-                let min_neg = "", min_count = Number.MAX_SAFE_INTEGER-1;
                 neg_nodes.forEach(function(neg){
                     let n_path = [];
                     let s_path = [];
+                    let start_neg = neg, start_sub = sub;
                     let p_count = 0; //count how many levels path has to take
                     while(true){
-                        let ntoken = neg.token, stoken = sub.token;
+                        p_count++;
+                        let ntoken = neg.data.token, stoken = sub.data.token;
                         n_path.push(ntoken);
                         s_path.push(stoken);
-                        if(neg.depth < sub.depth){ //if neg is lower
-                            if(s_path.includes(ntoken)) { break; }
-                        } else { //if sub is lower
-                            if(n_path.includes(stoken)){ break; }
+                        if(neg.depth > sub.depth){ //if neg is lower
+                            if(s_path.includes(ntoken) && p_count < min_path) {
+                                console.log(p_count, min_path)
+                                min_path = p_count;
+                                min_par = neg; min_neg = start_neg; min_sub = start_sub;
+                                break;
+                            }
+                        } else if(sub.depth >= neg.depth) { //if sub is lower
+                            if(n_path.includes(stoken) && p_count < min_path){ 
+                                min_path = p_count;
+                                min_par = sub; min_neg = start_neg; min_sub = start_sub;
+                                break;
+                             }
                         }
-
-                        p_count++;
                         if(neg.parent !== null) neg = neg.parent;
                         if(sub.parent !== null) sub = sub.parent;
-                    }
-                    if(p_count < min_count){
-                        min_neg = neg;
+                        if(neg.parent === null && sub.parent === null) break; //nothing
                     }
                 })
             })
+            return {"parent":min_par, "negative":min_neg, "subject":min_sub};
+        }
+
+        function neg_sub(neg_nodes,curr_subs){
+            let results = get_neg_sub(neg_nodes, curr_subs);
+            let neg = results["negative"];
+            let sub = results["subject"];
+            let par = results["parent"];
+            if(par !== ""){
+                while(neg.data.token !== par.data.token){
+                    console.log("neg"+neg.data.token);
+                    d3.select("#"+neg.data.token+neg.parent.data.token+offset)
+                        .attr("stroke","pink");
+                    d3.select("#"+neg.data.token+neg.data.idx+offset)
+                        .attr("stroke","pink");
+                    neg = neg.parent;
+                }
+                d3.select("#"+neg.data.token+neg.data.idx+offset).attr("stroke","pink");
+                while(sub.data.token !== par.data.token){
+                    console.log("sub"+sub.data.token);
+                    d3.select("#"+sub.data.token+sub.parent.data.token+offset)
+                        .attr("stroke","pink");
+                    d3.select("#"+sub.data.token+sub.data.idx+offset)
+                        .attr("stroke","pink");
+                    sub = sub.parent;
+                }
+                d3.select("#"+sub.data.token+sub.data.idx+offset).attr("stroke","pink");
+            }
         }
 
         //draw path from neg node to root
