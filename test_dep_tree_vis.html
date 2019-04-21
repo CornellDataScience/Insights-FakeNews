@@ -58,7 +58,6 @@
                         s_path.push(stoken);
                         if(neg.depth > sub.depth){ //if neg is lower
                             if(s_path.includes(ntoken) && p_count < min_path) {
-                                console.log(p_count, min_path)
                                 min_path = p_count;
                                 min_par = neg; min_neg = start_neg; min_sub = start_sub;
                                 break;
@@ -79,35 +78,33 @@
             return {"parent":min_par, "negative":min_neg, "subject":min_sub};
         }
 
-        function neg_sub(neg_nodes,curr_subs){
+        function neg_sub(neg_nodes,curr_subs, color){
             let results = get_neg_sub(neg_nodes, curr_subs);
             let neg = results["negative"];
             let sub = results["subject"];
             let par = results["parent"];
             if(par !== ""){
                 while(neg.data.token !== par.data.token){
-                    console.log("neg"+neg.data.token);
-                    d3.select("#"+neg.data.token+neg.parent.data.token+offset)
-                        .attr("stroke","pink");
-                    d3.select("#"+neg.data.token+neg.data.idx+offset)
-                        .attr("stroke","pink");
+                    d3.select("#"+"link"+neg.data.idx+neg.parent.data.idx+offset)
+                        .attr("stroke",color);
+                    d3.select("#"+"node"+neg.data.idx+offset)
+                        .attr("stroke",color);
                     neg = neg.parent;
                 }
-                d3.select("#"+neg.data.token+neg.data.idx+offset).attr("stroke","pink");
+                d3.select("#"+"node"+neg.data.idx+offset).attr("stroke",color);
                 while(sub.data.token !== par.data.token){
-                    console.log("sub"+sub.data.token);
-                    d3.select("#"+sub.data.token+sub.parent.data.token+offset)
-                        .attr("stroke","pink");
-                    d3.select("#"+sub.data.token+sub.data.idx+offset)
-                        .attr("stroke","pink");
+                    d3.select("#"+"link"+sub.data.idx+sub.parent.data.idx+offset)
+                        .attr("stroke",color);
+                    d3.select("#"+"node"+sub.data.idx+offset)
+                        .attr("stroke",color);
                     sub = sub.parent;
                 }
-                d3.select("#"+sub.data.token+sub.data.idx+offset).attr("stroke","pink");
+                d3.select("#"+"node"+sub.data.idx+offset).attr("stroke",color);
             }
         }
 
         //draw path from neg node to root
-        function negate_to_root(neg_nodes){
+        function negate_to_root(neg_nodes, color){
             if(neg_nodes.length === 0) { return; }
             let curr_node = neg_nodes[0];
             //iterate through neg nodes to find closest to root
@@ -118,39 +115,38 @@
             })
 
             while(curr_node.parent !== null){
-                let link = d3.select("#"+curr_node.data.token+curr_node.parent.data.token+offset)
-                    .attr("stroke","red");
-                d3.select("#"+curr_node.data.token+curr_node.data.idx+offset)
-                    .attr("stroke","red");
+                d3.select("#"+"link"+curr_node.data.idx+curr_node.parent.data.idx+offset)
+                    .attr("stroke",color);
+                d3.select("#"+"node"+curr_node.data.idx+offset)
+                    .attr("stroke",color);
                 curr_node = curr_node.parent;
             }
-            d3.select("#"+curr_node.data.token+curr_node.data.idx+offset)
-                .attr("stroke","red");
+            d3.select("#"+"node"+curr_node.data.idx+offset)
+                .attr("stroke",color);
         }
 
         //for each nd node, get siblings and ancestors. - number of overlap of things that are being negated - 
         // all parents up to node and other children of that parent, and the number of overlap
-
-        function send_help(nd_nodes) {
+        function ancestors(nd_nodes, color) {
             //find all the children of primary parent
-            negate_to_root(nd_nodes);
+            negate_to_root(nd_nodes, color);
             nd_nodes.forEach(function(n){
                 parenting = n.parent;
                 childs = parenting.children;
                 childs.forEach(function(child){
-                    d3.select("#"+child.data.token+parenting.data.token+offset)
-                        .attr("stroke","red");
-                    d3.select("#"+child.data.token+parenting.data.idx+offset)
-                        .attr("stroke","red");
+                    d3.select("#"+"link"+child.data.idx+parenting.data.idx+offset)
+                        .attr("stroke",color);
+                    d3.select("#"+"node"+child.data.idx+offset)
+                        .attr("stroke",color);
                 })
-        })
+            })
         }
 
         vis.selectAll(".link")
             .data(links)
             .enter().append("path")
             .attr("class", "link")
-            .attr("id", d => d.data.token+d.parent.data.token+offset)
+            .attr("id", d => "link"+d.data.idx+d.parent.data.idx+offset)
             .attr("fill", "none")
             .attr("stroke", "black")
             .attr("d", function (d) {
@@ -167,7 +163,7 @@
 
         node.append("circle")
             .attr("class", "node")
-            .attr("id", d=> d.data.token+d.data.idx+offset)
+            .attr("id", d=> "node"+d.data.idx+offset)
             .attr("fill", function(d){
                 let token = d.data.token;
                 if(negating_words.includes(token)){
@@ -200,9 +196,9 @@
             }
         });
 
-        negate_to_root(nd_nodes);
-        neg_sub(nd_nodes, curr_subjects);
-        send_help(nd_nodes);
+        // negate_to_root(nd_nodes,"red");
+        // neg_sub(nd_nodes, curr_subjects,"orange");
+        ancestors(nd_nodes,"yellow");
 
 
         node.append("text")
