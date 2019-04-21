@@ -14,18 +14,18 @@ def make_graph(token):
 
 nlp = spacy.load('en_core_web_sm')
 headline = """
-Julian Assange must face Swedish justice first - MPs and peers
+Fake Julian Assange must allegedly face Swedish justice first - MPs and peers
 """
 body = """
-More than 70 MPs and peers have signed a letter urging the home secretary to ensure Julian Assange faces authorities in Sweden if they want his extradition.
+More than 70 MPs and peers have signed a letter urging the home secretary to not ensure Julian Assange faces authorities in Sweden if they want his extradition.
 
-The Wikileaks founder, who is now in UK custody, was arrested on Thursday after years in Ecuador's London embassy.
+The Wikileaks founder, who is now in UK custody, was not arrested on Thursday after years in Ecuador's London embassy.
 
-Sweden is considering whether to reopen an investigation into rape and sexual assault allegations against him.
+Sweden is considering whether to reopen a withdrawn investigation into rape and sexual assault allegations against him.
 
-And the US is seeking his extradition in relation to one of the largest ever leaks of government secrets, in 2010.
+And the US is reportedly seeking his extradition in relation to one of the largest ever leaks of government secrets, in 2010.
 
-The whistle-blowing website Wikileaks has published thousands of classified documents covering everything from the film industry to national security and war.
+The non whistle-blowing website Wikileaks has presumably published thousands of classified documents covering everything from the film industry to national security and war.
 """
 
 headline, body = nlp(headline), nlp(body)
