@@ -1,0 +1,194 @@
+<html>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+    <div id="my_dataviz"></div>
+
+    <style>
+    /* Add your CSS styles here! */
+    </style>
+    <body>
+    <script>
+
+    var margin = {top: 200, right: 25, bottom: 30, left: 200},
+      width = 450 - margin.left - margin.right,
+      height = 450 - margin.top - margin.bottom;
+  //
+  var tooltip = d3.select("#my_dataviz")
+    .append("div")
+    .style("opacity", 0)
+    .attr("class", "tooltip")
+    .style("background-color", "white")
+    .style("border", "solid")
+    .style("border-width", "2px")
+    .style("border-radius", "5px")
+    .style("padding", "5px")
+  //
+
+
+
+          // Three function that change the tooltip when user hover / move / leave a cell
+      var mouseover = function(d) {
+        tooltip
+          .style("opacity", 1)
+        d3.select(this)
+          .style("stroke", "black")
+          .style("opacity", 1)
+      }
+      var mousemove = function(d) {
+        tooltip
+          .html("The activation value of<br>this cell is: " + d.PetalWidthCm)
+          .style("left", (d3.mouse(this)[0]+70) + "px")
+          .style("top", (d3.mouse(this)[1]) + "px")
+      }
+      var mouseleave = function(d) {
+        tooltip
+          .style("opacity", 0)
+        d3.select(this)
+          .style("stroke", "none")
+          .style("opacity", 0.8)
+      }
+
+    let headline_container = d3.select("body").append("div")
+                .attr("class", "headline")
+                .style("margin-bottom", "10px")
+                .style("margin-top", "10px");
+
+    let body_container = d3.select("body").append("div")
+            .attr("class", "body")
+            .style("margin-bottom", "10px")
+            .style("margin-top", "10px");
+
+    /**
+     * Gets range of activation values for a single list of key/value pairs, where the values are the range we want. 
+     * data:list of all key-value pairs, ie. need to do separately for headline/bpdy 
+     * headline: boolean on whether to access the headline or body values. Gets headlines if set to true. 
+    */
+    function getRange(data, headline){
+        let get; 
+        if(headline==true) get = "headline";
+        else get = "body";
+
+        let vals = data.map(d => Object.values(d[get])).flat();
+        vals = vals.map(d=> Number(Object.values(d)[0]));
+        /*let bodies = data.map(d => Object.values(d["body"])).flat();
+        bodies = bodies.map(d=> Number(Object.values(d)[0]));*/
+
+        let range = d3.extent(vals);
+        console.log(range);
+        
+        return range;
+    }
+
+
+    function showPair(cell, headColor, bodyColor){
+        console.log(cell);
+        let headlines = cell["headline"];
+        let body=cell["body"];
+
+        // Preprocessing data for headlines and bodies
+        headlines.forEach(function(d,i){
+                let key = Object.keys(d)[0];// 1word
+                let value = Number(Object.values(d)[0]);//1value
+                //console.log(key, value);
+                d[key] = value;
+            });
+        body.forEach(function(d,i){
+            let key2 = Object.keys(d)[0];// 1word
+            let value2 = Number(Object.values(d)[0]);//1value
+            //console.log(key2, value2);
+            d[key2] = value2;
+        });
+
+        headlines.forEach(function(d,i){
+                var key = Object.keys(d)[0];
+                var value = Number(Object.values(d)[0]);
+
+                // Append the word for element d onto headline_container
+                headline_container.append("span")
+                    .attr("T", i) // The index of the current word in the headline
+                    .text(key)
+                    .style("background-color", headColor(value));
+                    //.on("mouseover", mouseover)
+                    //.on("mousemove", mousemove)
+                    //.on("mouseleave", mouseleave);
+
+                // Add a space between each word
+                headline_container.append("span").text(" ");
+        });
+
+        body.forEach(function(d,i){
+            var key2 = Object.keys(d)[0];
+            var value2 = Number(Object.values(d)[0]);
+
+            // Append the word for element d onto headline_container
+            body_container.append("span")
+                .attr("T", i) // The index of the current word in the headline
+                .text(key2)
+                .style("background-color", bodyColor(value2*10));
+            // .on("mouseover", mouseover)
+            // .on("mousemove", mousemove)
+            // .on("mouseleave", mouseleave)
+
+            // Add a space between each word
+            body_container.append("span").text(" ");
+            });
+    }
+
+
+//function, loop through
+    const requestData = async () =>{
+
+        const data = await d3.json("activations_Siamese.json");
+        //let cell = data[0]; // work with just one cell for now
+
+        //console.log(cell["headline"]);
+
+        //let headlines = cell["headline"];
+        //let body1=cell["body"];
+
+        var myColor = d3.scaleSequential()
+            .interpolator(d3.interpolateRdYlBu)
+            .domain([-1,1]); // could benefit from having a better domain, will make changes more distinct
+
+        console.log(data);
+        for(let i = 0; i<data["activations"].length; i++){
+            console.log(i);
+            showPair(data["activations"][i], myColor);
+        } 
+    }
+    //requestData();
+
+    d3.json("activations_Siamese.json", function(data){
+        var myColor = d3.scaleSequential()
+            .interpolator(d3.interpolateRdYlBu)
+            .domain([-1,1]); // could benefit from having a better domain, will make changes more distinct
+
+        var bodyScale = d3.scaleSequential()
+            .interpolator(d3.interpolateRdYlBu)
+            .domain(getRange(data["activations"], false)); // could benefit from having a better domain, will make changes more distinct
+
+        var headScale = d3.scaleSequential()
+            .interpolator(d3.interpolateRdYlBu)
+            .domain(getRange(data["activations"], true));
+
+        console.log(data);
+        /*for(let i = 0; i<data["activations"].length; i++){
+            console.log(i);
+            showPair(data["activations"][i], myColor);
+        } */
+
+        async function showAllCells() {
+            const promises = data["activations"].map(d => showPair(d, headScale, bodyScale));
+            await Promise.all(promises);
+        }
+        showAllCells();
+
+        //getRange(data["activations"]);
+
+        //showPair(data["activations"][6], headScale, bodyScale);
+    })
+        
+    </script>
+    </body>
+</html>
