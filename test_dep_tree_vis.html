@@ -1,152 +1,221 @@
 <html>
 <script src="https://d3js.org/d3.v5.min.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+<style>
+    text {
+        font-family: "Gill Sans";
+    }
+
+    div {
+        font-family: "Gill Sans"
+    }
+</style>
 
 <body>
+    <div class="card centered" width="400" height="700" style="text-align:center">
+        <h1>CDS Insights - Fake News Project - Stance Detection using Tree Models</h1>
+    </div>
+    <div id="graphs"></div>
+    <div class="container text-center">
+        <div class="btn-group btn-group-toggle py-3" data-toggle="buttons">
+            <button type="button" class="btn btn-secondary border" name="options"
+            id="option1"> Negative Words Feature
+            <button type="button" class="btn btn-secondary border" name="options"
+            id="option2"> Negative Ancestors and Siblings Feature
+            <button type="button" class="btn btn-secondary border" name="options"
+            id="option3"> Negative Word/Subject Feature
+            <button type="button" class="btn btn-secondary border" name="options"
+            id="option4"> Normal
+        </div>
+    </div>
 </body>
+
 <script>
     let negating_words = [
-        "n't", "not", "no", 
-        "never", "nobody", "non", "nope"];
+        "n't", "not", "no",
+        "never", "nobody", "non", "nope"
+    ];
     let doubting_words = [
-        'fake','fraud', 'hoax', 
-        'false', 'deny', 'denies', 
-        'despite', 'doubt', 
-        'bogus', 'debunk', 'prank', 
+        'fake', 'fraud', 'hoax',
+        'false', 'deny', 'denies',
+        'despite', 'doubt',
+        'bogus', 'debunk', 'prank',
         'retract', 'scam', "withdrawn",
-        "misinformation"];
+        "misinformation"
+    ];
     let hedging_words = [
-        'allege', 'allegedly','apparently',
-        'appear','claim','could',
-        'evidently','largely','likely',
-        'mainly','may', 'maybe', 'might',
-        'mostly','perhaps','presumably',
-        'probably','purport', 'purportedly',
+        'allege', 'allegedly', 'apparently',
+        'appear', 'claim', 'could',
+        'evidently', 'largely', 'likely',
+        'mainly', 'may', 'maybe', 'might',
+        'mostly', 'perhaps', 'presumably',
+        'probably', 'purport', 'purportedly',
         'reported', 'reportedly',
         'rumor', 'rumour', 'rumored', 'rumoured',
-        'says','seem','somewhat',
-        'unconfirmed'];
-    let subject_check = ["nsubj", "nsubjpass", "csubj","csubjpass", "agent","compound"];
+        'says', 'seem', 'somewhat',
+        'unconfirmed'
+    ];
+    let subject_check = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "compound"];
     let subjects = [];
+    let nd_nodes = {}; //negating/doubting words
+    let curr_subjects = {}; //subjects for each offset
 
     var width = window.innerWidth,
-        height = window.innerHeight * 1.5;
-    var svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
-    
+        height = 650;
+    var svg = d3.select("#graphs").append("svg").attr("width", width).attr("height", height);
+
+    //finds smallest path of sub/neg and returns the parent
+    function get_neg_sub(neg_nodes, curr_subs, offset) {
+        let min_par = "",
+            min_neg = "",
+            min_sub = "",
+            min_path = Number.MAX_SAFE_INTEGER - 1;
+        curr_subs.forEach(function (sub) {
+            neg_nodes.forEach(function (neg) {
+                let n_path = [];
+                let s_path = [];
+                let start_neg = neg,
+                    start_sub = sub;
+                let p_count = 0; //count how many levels path has to take
+                while (true) {
+                    p_count++;
+                    let ntoken = neg.data.token,
+                        stoken = sub.data.token;
+                    n_path.push(ntoken);
+                    s_path.push(stoken);
+                    if (neg.depth > sub.depth) { //if neg is lower
+                        if (s_path.includes(ntoken) && p_count < min_path) {
+                            min_path = p_count;
+                            min_par = neg;
+                            min_neg = start_neg;
+                            min_sub = start_sub;
+                            break;
+                        }
+                    } else if (sub.depth >= neg.depth) { //if sub is lower
+                        if (n_path.includes(stoken) && p_count < min_path) {
+                            min_path = p_count;
+                            min_par = sub;
+                            min_neg = start_neg;
+                            min_sub = start_sub;
+                            break;
+                        }
+                    }
+                    if (neg.parent !== null) neg = neg.parent;
+                    if (sub.parent !== null) sub = sub.parent;
+                    if (neg.parent === null && sub.parent === null) break; //nothing
+                }
+            })
+        })
+        return {
+            "parent": min_par,
+            "negative": min_neg,
+            "subject": min_sub
+        };
+    }
+
+    //draws path from sub to neg
+    function neg_sub(neg_nodes, curr_subs, color, offset) {
+        let results = get_neg_sub(neg_nodes, curr_subs);
+        let neg = results["negative"];
+        let sub = results["subject"];
+        let par = results["parent"];
+        if (par !== "") {
+            while (neg.data.token !== par.data.token) {
+                d3.select("#" + "link" + neg.data.idx + neg.parent.data.idx + offset)
+                    .attr("stroke", color);
+                d3.select("#" + "node" + neg.data.idx + offset)
+                    .attr("stroke", color);
+                neg = neg.parent;
+            }
+            d3.select("#" + "node" + neg.data.idx + offset).attr("stroke", color);
+            while (sub.data.token !== par.data.token) {
+                d3.select("#" + "link" + sub.data.idx + sub.parent.data.idx + offset)
+                    .attr("stroke", color);
+                d3.select("#" + "node" + sub.data.idx + offset)
+                    .attr("stroke", color);
+                sub = sub.parent;
+            }
+            d3.select("#" + "node" + sub.data.idx + offset).attr("stroke", color);
+        }
+    }
+
+    //draw path from neg node to root
+    function negate_to_root(neg_nodes, color, offset) {
+        if (neg_nodes.length === 0) {
+            return;
+        }
+        let curr_node = neg_nodes[0];
+        //iterate through neg nodes to find closest to root
+        neg_nodes.forEach(function (d) {
+            if (d.depth < curr_node.depth) {
+                curr_node = d;
+            }
+        })
+
+        while (curr_node.parent !== null) {
+            d3.select("#" + "link" + curr_node.data.idx + curr_node.parent.data.idx + offset)
+                .attr("stroke", color);
+            d3.select("#" + "node" + curr_node.data.idx + offset)
+                .attr("stroke", color);
+            curr_node = curr_node.parent;
+        }
+        d3.select("#" + "node" + curr_node.data.idx + offset)
+            .attr("stroke", color);
+    }
+
+    //for each nd node, get siblings and ancestors. - number of overlap of things that are being negated - 
+    // all parents up to node and other children of that parent, and the number of overlap
+    function ancestors(neg_nodes, color, offset) {
+        //find all the children of primary parent
+        negate_to_root(neg_nodes, color, offset);
+        neg_nodes.forEach(function (n) {
+            parenting = n.parent;
+            childs = parenting.children;
+            childs.forEach(function (child) {
+                d3.select("#" + "link" + child.data.idx + parenting.data.idx + offset)
+                    .attr("stroke", color);
+                d3.select("#" + "node" + child.data.idx + offset)
+                    .attr("stroke", color);
+            })
+        })
+    }
+
     function drawDepTree(data, offset) {
-        var vis = svg.append("g").attr("transform", `translate (0, ${20 + offset * height/6})`)
-        var treemap = d3.tree().size([width, height / 6 - 20]);
+        if (offset === 0) {
+            width = window.innerWidth;
+        } else {
+            width = window.innerWidth / 4;
+        }
+        let vis_container = svg.append("g").attr("transform",
+            `translate (${width * Math.max((offset-1),0)}, ${30 + Math.min(offset,1) * height/2})`);
+        vis_container.append("text").text(function(){
+                if(offset === 0) return "Headline"
+                else return "Sentence " + offset;
+            })
+            .attr("x",20)
+            .attr("y",20)
+            .style("font-size",20);
+        var vis = vis_container.append("g").attr("transform",
+            `translate (0, 20)`);
+        vis_container.append("rect").attr("x", 0).attr("y", 0) //border
+            .attr("height", height / 2 - 30)
+            .attr("width", width)
+            .style("stroke", "black")
+            .style("fill", "none")
+            .style("stroke-width", 1);
+        // vis.on("click", vis.attr("transform",`translate(0,${30+ 2 * height/2})`));
+        var treemap = d3.tree().size([width - 30, height / 2 - 60]);
         var root = d3.hierarchy(data, (d) => d.children);
         var treemap = treemap(root);
         var nodes = treemap;
         var links = treemap.descendants().slice(1);
-        let nd_nodes = []; //negating/doubting words
-        let curr_subjects = [];
-
-        //finds smallest path of sub/neg and returns the parent
-        function get_neg_sub(neg_nodes, curr_subs){
-            let min_par = "", min_neg = "", min_sub = "", min_path = Number.MAX_SAFE_INTEGER-1;
-            curr_subs.forEach(function(sub){
-                neg_nodes.forEach(function(neg){
-                    let n_path = [];
-                    let s_path = [];
-                    let start_neg = neg, start_sub = sub;
-                    let p_count = 0; //count how many levels path has to take
-                    while(true){
-                        p_count++;
-                        let ntoken = neg.data.token, stoken = sub.data.token;
-                        n_path.push(ntoken);
-                        s_path.push(stoken);
-                        if(neg.depth > sub.depth){ //if neg is lower
-                            if(s_path.includes(ntoken) && p_count < min_path) {
-                                min_path = p_count;
-                                min_par = neg; min_neg = start_neg; min_sub = start_sub;
-                                break;
-                            }
-                        } else if(sub.depth >= neg.depth) { //if sub is lower
-                            if(n_path.includes(stoken) && p_count < min_path){ 
-                                min_path = p_count;
-                                min_par = sub; min_neg = start_neg; min_sub = start_sub;
-                                break;
-                             }
-                        }
-                        if(neg.parent !== null) neg = neg.parent;
-                        if(sub.parent !== null) sub = sub.parent;
-                        if(neg.parent === null && sub.parent === null) break; //nothing
-                    }
-                })
-            })
-            return {"parent":min_par, "negative":min_neg, "subject":min_sub};
-        }
-
-        function neg_sub(neg_nodes,curr_subs, color){
-            let results = get_neg_sub(neg_nodes, curr_subs);
-            let neg = results["negative"];
-            let sub = results["subject"];
-            let par = results["parent"];
-            if(par !== ""){
-                while(neg.data.token !== par.data.token){
-                    d3.select("#"+"link"+neg.data.idx+neg.parent.data.idx+offset)
-                        .attr("stroke",color);
-                    d3.select("#"+"node"+neg.data.idx+offset)
-                        .attr("stroke",color);
-                    neg = neg.parent;
-                }
-                d3.select("#"+"node"+neg.data.idx+offset).attr("stroke",color);
-                while(sub.data.token !== par.data.token){
-                    d3.select("#"+"link"+sub.data.idx+sub.parent.data.idx+offset)
-                        .attr("stroke",color);
-                    d3.select("#"+"node"+sub.data.idx+offset)
-                        .attr("stroke",color);
-                    sub = sub.parent;
-                }
-                d3.select("#"+"node"+sub.data.idx+offset).attr("stroke",color);
-            }
-        }
-
-        //draw path from neg node to root
-        function negate_to_root(neg_nodes, color){
-            if(neg_nodes.length === 0) { return; }
-            let curr_node = neg_nodes[0];
-            //iterate through neg nodes to find closest to root
-            neg_nodes.forEach(function(d){
-                if(d.depth < curr_node.depth){
-                    curr_node = d;
-                }
-            })
-
-            while(curr_node.parent !== null){
-                d3.select("#"+"link"+curr_node.data.idx+curr_node.parent.data.idx+offset)
-                    .attr("stroke",color);
-                d3.select("#"+"node"+curr_node.data.idx+offset)
-                    .attr("stroke",color);
-                curr_node = curr_node.parent;
-            }
-            d3.select("#"+"node"+curr_node.data.idx+offset)
-                .attr("stroke",color);
-        }
-
-        //for each nd node, get siblings and ancestors. - number of overlap of things that are being negated - 
-        // all parents up to node and other children of that parent, and the number of overlap
-        function ancestors(nd_nodes, color) {
-            //find all the children of primary parent
-            negate_to_root(nd_nodes, color);
-            nd_nodes.forEach(function(n){
-                parenting = n.parent;
-                childs = parenting.children;
-                childs.forEach(function(child){
-                    d3.select("#"+"link"+child.data.idx+parenting.data.idx+offset)
-                        .attr("stroke",color);
-                    d3.select("#"+"node"+child.data.idx+offset)
-                        .attr("stroke",color);
-                })
-            })
-        }
 
         vis.selectAll(".link")
             .data(links)
             .enter().append("path")
             .attr("class", "link")
-            .attr("id", d => "link"+d.data.idx+d.parent.data.idx+offset)
+            .attr("id", d => "link" + d.data.idx + d.parent.data.idx + offset)
             .attr("fill", "none")
             .attr("stroke", "black")
             .attr("d", function (d) {
@@ -163,43 +232,37 @@
 
         node.append("circle")
             .attr("class", "node")
-            .attr("id", d=> "node"+d.data.idx+offset)
-            .attr("fill", function(d){
+            .attr("id", d => "node" + d.data.idx + offset)
+            .attr("fill", function (d) {
                 let token = d.data.token;
-                if(negating_words.includes(token)){
+                if (negating_words.includes(token)) {
                     return "red";
-                } else if(doubting_words.includes(token)){
+                } else if (doubting_words.includes(token)) {
                     return "orange";
-                } else if(hedging_words.includes(token)){
+                } else if (hedging_words.includes(token)) {
                     return "green";
-                } else if(subjects.includes(token)){
+                } else if (subjects.includes(token)) {
                     return "blue";
                 }
                 return "gray";
             })
             .attr("stroke", "black")
-            .style("stroke-width",1)
+            .style("stroke-width", 1)
             .attr("r", 4.5)
             .attr("cx", (d) => d.x)
-            .attr("cy", (d) => d.y)
-            .on("mouseover",function(d){
-                console.log(d);
-            });
+            .attr("cy", (d) => d.y);
 
         //identifies which nodes are negating/doubting, iterates to root and colors path
-        node.each(function(d){
-            if(negating_words.includes(d.data.token) ||
-                doubting_words.includes(d.data.token)){
-                nd_nodes.push(d);
-            } else if(subjects.includes(d.data.token)){
-                curr_subjects.push(d);
+        nd_nodes[offset] = [];
+        curr_subjects[offset] = [];
+        node.each(function (d) {
+            if (negating_words.includes(d.data.token) ||
+                doubting_words.includes(d.data.token)) {
+                nd_nodes[offset].push(d);
+            } else if (subjects.includes(d.data.token)) {
+                curr_subjects[offset].push(d);
             }
         });
-
-        // negate_to_root(nd_nodes,"red");
-        // neg_sub(nd_nodes, curr_subjects,"orange");
-        ancestors(nd_nodes,"yellow");
-
 
         node.append("text")
             .text((d) => d.data.token)
@@ -209,21 +272,44 @@
     }
 
     //getting subjects from headline
-    function finding_subj(head){
-        if(["nsubj", "nsubjpass", "csubj","csubjpass", "agent","compound"].includes(head.dep)){
-            subjects.push(head.token);   
+    function finding_subj(head) {
+        if (["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "compound"].includes(head.dep)) {
+            subjects.push(head.token);
         }
-        head.children.forEach(function(d){
+        head.children.forEach(function (d) {
             finding_subj(d);
         })
     }
+
+    //colors
+    let colors = ["red","orange","purple","black"];
+    //buttons
+    d3.select("#option1").on("click", function () {
+        for(let i = 0; i < 5; i++){
+            negate_to_root(nd_nodes[i], colors[0],i);
+        }
+    }).style("color",colors[0]);
+    d3.select("#option2").on("click", function () {
+        for(let i = 0; i < 5; i++){
+            ancestors(nd_nodes[i], colors[1],i);
+        }
+    }).style("color",colors[1]);
+    d3.select("#option3").on("click", function () {
+        for(let i = 0; i < 5; i++){
+            neg_sub(nd_nodes[i],curr_subjects[i],colors[2],i);
+        }
+    }).style("color",colors[2]);
+    d3.select("#option4").on("click", function () {
+        d3.selectAll(".link").attr("stroke","black");
+        d3.selectAll(".node").attr("stroke","black");
+    }).style("color",colors[3]);
 
     d3.json("test_deps_tree.json").then((json) => {
         var data = json.body;
         data.unshift(json.headline);
         console.log(data);
         finding_subj(json.headline); //get subjects
-        data.forEach((d,i) => {
+        data.forEach((d, i) => {
             drawDepTree(d, i);
         });
     });
