@@ -6,6 +6,20 @@
 
     <style>
     /* Add your CSS styles here! */
+    .cell{
+        width:80%;
+        margin:auto;
+        margin-bottom:10px;
+        border-radius:5px;
+        -webkit-box-shadow: -4px 4px 5px -3px rgba(0,0,0,0.75);
+        -moz-box-shadow: -4px 4px 5px -3px rgba(0,0,0,0.75);
+        box-shadow: -4px 4px 5px -3px rgba(0,0,0,0.75);
+        padding:5px;
+        border-radius: 8px 8px 8px 8px;
+        -moz-border-radius: 8px 8px 8px 8px;
+        -webkit-border-radius: 8px 8px 8px 8px;
+        border: 1px solid #0000003a;
+    }
     </style>
     <body>
     <script>
@@ -24,9 +38,6 @@
     .style("border-radius", "5px")
     .style("padding", "5px")
   //
-
-
-
           // Three function that change the tooltip when user hover / move / leave a cell
       var mouseover = function(d) {
         tooltip
@@ -48,16 +59,6 @@
           .style("stroke", "none")
           .style("opacity", 0.8)
       }
-
-    let headline_container = d3.select("body").append("div")
-                .attr("class", "headline")
-                .style("margin-bottom", "10px")
-                .style("margin-top", "10px");
-
-    let body_container = d3.select("body").append("div")
-            .attr("class", "body")
-            .style("margin-bottom", "10px")
-            .style("margin-top", "10px");
 
     /**
      * Gets range of activation values for a single list of key/value pairs, where the values are the range we want. 
@@ -81,7 +82,7 @@
     }
 
 
-    function showPair(cell, headColor, bodyColor){
+    async function showPair(cell, headColor, bodyColor, groupID){
         console.log(cell);
         let headlines = cell["headline"];
         let body=cell["body"];
@@ -99,8 +100,18 @@
             //console.log(key2, value2);
             d[key2] = value2;
         });
+        var headline_container = d3.select(`#${groupID}`).append("div")
+                .attr("class", "headline")
+                //.style("margin-bottom", "10px")
+                .style("margin-top", "10px");
 
-        headlines.forEach(function(d,i){
+        var body_container = d3.select(`#${groupID}`).append("div")
+            .attr("class", "body")
+            .style("margin-bottom", "10px")
+            .style("margin-top", "0px");
+
+        var h = new Promise(function(resolve,reject){
+            headlines.forEach(function(d,i){
                 var key = Object.keys(d)[0];
                 var value = Number(Object.values(d)[0]);
 
@@ -115,9 +126,11 @@
 
                 // Add a space between each word
                 headline_container.append("span").text(" ");
+            });
+            resolve("");
         });
-
-        body.forEach(function(d,i){
+        h.then(d=>{
+            body.forEach(function(d,i){
             var key2 = Object.keys(d)[0];
             var value2 = Number(Object.values(d)[0]);
 
@@ -133,6 +146,7 @@
             // Add a space between each word
             body_container.append("span").text(" ");
             });
+        });
     }
 
 
@@ -172,21 +186,12 @@
             .interpolator(d3.interpolateRdYlBu)
             .domain(getRange(data["activations"], true));
 
-        console.log(data);
-        /*for(let i = 0; i<data["activations"].length; i++){
-            console.log(i);
-            showPair(data["activations"][i], myColor);
-        } */
-
-        async function showAllCells() {
-            const promises = data["activations"].map(d => showPair(d, headScale, bodyScale));
-            await Promise.all(promises);
-        }
-        showAllCells();
-
-        //getRange(data["activations"]);
-
-        //showPair(data["activations"][6], headScale, bodyScale);
+        // Shows all cells in one go
+        for(let i = 0; i<data["activations"].length; i++){
+            //console.log(i);
+            d3.select("body").append("div").attr("id", `cell-${i}`).attr("class", "cell");
+            showPair(data["activations"][i], headScale, bodyScale, `cell-${i}`);
+        }      
     })
         
     </script>
