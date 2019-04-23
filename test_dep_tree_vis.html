@@ -285,17 +285,17 @@
     let colors = ["red","orange","purple","black"];
     //buttons
     d3.select("#option1").on("click", function () {
-        for(let i = 0; i < 5; i++){
+        for(let i = 0; i < 6; i++){
             negate_to_root(nd_nodes[i], colors[0],i);
         }
     }).style("color",colors[0]);
     d3.select("#option2").on("click", function () {
-        for(let i = 0; i < 5; i++){
+        for(let i = 0; i < 6; i++){
             ancestors(nd_nodes[i], colors[1],i);
         }
     }).style("color",colors[1]);
     d3.select("#option3").on("click", function () {
-        for(let i = 0; i < 5; i++){
+        for(let i = 0; i < 6; i++){
             neg_sub(nd_nodes[i],curr_subjects[i],colors[2],i);
         }
     }).style("color",colors[2]);
