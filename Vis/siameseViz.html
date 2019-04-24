@@ -64,6 +64,20 @@
                                     <a class="dropdown-item" href="#" onclick="updateView(4);return false;">All Cells</a>
                                 </div>
                         </div>
+                        <div class="dropdown" style="margin-top:5px">
+                            <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="dropdownMenuButton"
+                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                Stances
+                            </button>
+                            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                                <a class="dropdown-item" href="#" onclick="updateData('correctAgree');return false;">Correctly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDisagree');return false;">Correctly Classified Disgree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDiscuss');return false;">Correctly Classified Discuss</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incAgree');return false;">Incorrectly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDisagree');return false;">Incorrectly Classified Disgree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDiscuss');return false;">Incorrectly Classified Discuss</a>
+                            </div>
+                    </div>
                 </div>
                 <div class="scatter col-md"></div>
         </div>
@@ -117,6 +131,8 @@
     <script>
     $('.dropdown-toggle').dropdown();
 
+    d3.selectAll(".pagination").style("display","none");
+
     var margin = {top: 200, right: 25, bottom: 30, left: 200},
       width = 450 - margin.left - margin.right,
       height = 450 - margin.top - margin.bottom;
@@ -135,8 +151,8 @@
     // TODO: Add controls to select a headline/body to look at 
     // TODO: Extract classification result so that can compare samples that are/n't classified correctly 
     function updateView(n){
-        console.log(n);
-        console.log(actData);
+        //console.log(n);
+        //console.log(actData);
         d3.select(".scatter").select("svg").remove();
 
         switch(n){
@@ -153,6 +169,11 @@
                 showAttr(actData, headScale, bodyScale, "Lowest Variance Response", "bot5_var");
                 break;
             case 4:
+                d3.selectAll(".cell").remove();
+                for(let i = 0; i<actData["activations"].length; i++){
+                //console.log(i);
+                    showPair(actData["activations"][i], headScale, bodyScale, `cell-${i}`);
+                } 
                 break;
         }
 
@@ -358,46 +379,45 @@
             .style("font-size", "0.7em");
     }
 
-    d3.json("activations_Siamese.json", function(data){
-        var myColor = d3.scaleSequential()
-            .interpolator(d3.interpolateRdYlBu)
-            .domain([-1,1]); // could benefit from having a better domain, will make changes more distinct
+    function updateData(title){
+        console.log(title);
+        d3.json(`activations_Siamese_${title}.json`, function(data){
+            actData = data;
+            console.log(data);
+            var myColor = d3.scaleSequential()
+                .interpolator(d3.interpolateRdYlBu)
+                .domain([-1,1]); // could benefit from having a better domain, will make changes more distinct
 
-        bodyScale = d3.scaleSequential()
-            .interpolator(d3.interpolateRdYlBu)
-            .domain(getRange(data["activations"], false)); // could benefit from having a better domain, will make changes more distinct
+            bodyScale = d3.scaleSequential()
+                .interpolator(d3.interpolateRdYlBu)
+                .domain(getRange(data["activations"], false)); // could benefit from having a better domain, will make changes more distinct
 
-        headScale = d3.scaleSequential()
-            .interpolator(d3.interpolateRdYlBu)
-            .domain(getRange(data["activations"], true));
-        
-        text = data['remain_b'];
-        actData = data;
-
-        // Shows all cells in one go
-        /*for(let i = 0; i<data["activations"].length; i++){
-            //console.log(i);
-            showPair(data["activations"][i], headScale, bodyScale, `cell-${i}`);
-        }  */  
-
-        updateView(0);
-    })
+            headScale = d3.scaleSequential()
+                .interpolator(d3.interpolateRdYlBu)
+                .domain(getRange(data["activations"], true));
+            
+            text = data['remain_b'];
+            updateView(0);
+        });
+    }
+    updateData('correctAgree');
+    
 
     function showAttr(data, headScale, bodyScale, title, accessor){
         d3.selectAll(".cell").remove();
         let headlines = d3.selectAll(".attrTitle")["_groups"][0];
         d3.select(headlines[0]).text(`${title}: Headline Branch`)
             .style("margin-top","10px");
-        data["important_h"][accessor].forEach(function(cnum){
+        actData["important_h"][accessor].forEach(function(cnum){
             cnum = Number(cnum);
             d3.select(".headlineCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
-            showPair(data["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
+            showPair(actData["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
         });
         d3.select(headlines[1]).text(`${title}: Body Branch`);
-        data["important_b"][accessor].forEach(function(cnum){
+        actData["important_b"][accessor].forEach(function(cnum){
             cnum = Number(cnum);
             d3.select(".bodyCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
-            showPair(data["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
+            showPair(actData["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
         });
     }
     </script>
