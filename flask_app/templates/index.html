@@ -61,6 +61,10 @@
             margin: auto;
         }
 
+        #btnDiv {
+            margin: auto;
+        }
+
         #formContainer {
             margin: auto;
         }
@@ -79,7 +83,11 @@
 
 <body>
     <div class="card centered" width="400" height="700">
-        <h1>CDS Insights - Fake News Project Visualization</h1>
+        <h1><span>
+                <image width="75" height="75" src="{{ url_for('static', filename='logo.png') }}"></image>
+            </span>CDS Insights - Fake News Project Visualization<span>
+                <image width="75" height="75" src="{{ url_for('static', filename='logo.png') }}"></image>
+            </span></h1>
         <div class="row justify-content-center">
             <div class="card text-center" width=400>Type in an article headline and article body (or select one of the
                 examples) and press submit. </div>
@@ -421,19 +429,20 @@
                     drawDepTree(d, i);
                 });
                 var btndiv = d3.select("body").append("div")
-                .attr("class", "btn-group btn-group-toggle py-3").attr("data-toggle","buttons")
-                .style("margin","auto");
+                    .attr("id","btnDiv")
+                    .attr("class", "btn-group btn-group-toggle py-3").attr("data-toggle", "buttons")
+                    .style("margin-left", "25vw");
                 btndiv.append("button")
-                .attr("type","button").attr("class","btn btn-secondary border")
-                .attr("name","options").attr("id","option1").text("Root to Negating Word");
+                    .attr("type", "button").attr("class", "btn btn-secondary border")
+                    .attr("name", "options").attr("id", "option1").text("Root to Negating Word");
                 btndiv.append("button")
-                .attr("type","button").attr("class","btn btn-secondary border")
-                .attr("name","options").attr("id","option2").text("Ancestors/Siblings of Negating Words");
+                    .attr("type", "button").attr("class", "btn btn-secondary border")
+                    .attr("name", "options").attr("id", "option2").text("Ancestors/Siblings of Negating Words");
                 btndiv.append("button")
-                .attr("type","button").attr("class","btn btn-secondary border")
-                .attr("name","options").attr("id","option3").text("Subject to Negating Word");
-                btndiv.append("button").attr("type","button").attr("class","btn btn-secondary border")
-                .attr("name","options").attr("id","option4").text("Normal");
+                    .attr("type", "button").attr("class", "btn btn-secondary border")
+                    .attr("name", "options").attr("id", "option3").text("Subject to Negating Word");
+                btndiv.append("button").attr("type", "button").attr("class", "btn btn-secondary border")
+                    .attr("name", "options").attr("id", "option4").text("Normal");
                 //colors
                 let colors = ["red", "orange", "purple", "black"];
                 //buttons
@@ -441,22 +450,22 @@
                     for (let i = 0; i < 6; i++) {
                         negate_to_root(nd_nodes[i], colors[0], i);
                     }
-                }).style("color", colors[0]).style("background-color","white");
+                }).style("color", colors[0]).style("background-color", "white");
                 d3.select("#option2").on("click", function () {
                     for (let i = 0; i < 6; i++) {
                         ancestors(nd_nodes[i], colors[1], i);
                     }
-                }).style("color", colors[1]).style("background-color","white");
+                }).style("color", colors[1]).style("background-color", "white");
                 d3.select("#option3").on("click", function () {
                     for (let i = 0; i < 6; i++) {
                         neg_sub(nd_nodes[i], curr_subjects[i], colors[2], i);
                     }
-                }).style("color", colors[2]).style("background-color","white");
+                }).style("color", colors[2]).style("background-color", "white");
                 d3.select("#option4").on("click", function () {
                     d3.selectAll(".link").attr("stroke", "black");
                     d3.selectAll(".link").attr("stroke-width", 1);
                     d3.selectAll(".node").attr("stroke", "black");
-                }).style("color", colors[3]).style("background-color","white");
+                }).style("color", colors[3]).style("background-color", "white");
             }
         }
 
@@ -910,7 +919,7 @@
             .attr("class", "link")
             .attr("id", d => "link" + d.data.idx + d.parent.data.idx + offset)
             .attr("fill", "none")
-            .attr("stroke-width",1)
+            .attr("stroke-width", 1)
             .attr("stroke", "black")
             .attr("d", function (d) {
                 return "M" + d.x + "," + d.y +
