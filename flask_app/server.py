@@ -75,14 +75,14 @@ def classify_helper(headline, bodies):
 
 @app.route('/', methods = ['GET'])
 def classify():
-    headline = request.args.get('headlineInput').replace("'",'').replace('"','')
-    body = request.args.get('bodyInput').replace("'",'').replace('"','')
+    headline = request.args.get('headlineInput')
+    body = request.args.get('bodyInput')
     results = []
     if not headline:
         results = []
     else:
-        print(headline)
-        print(body[:10])
+        headine = headline.replace("'",'').replace('"','')
+        body = body.replace("'",'').replace('"','')
         results = classify_helper(headline, [body])
     return render_template('index.html', data=results)
 
