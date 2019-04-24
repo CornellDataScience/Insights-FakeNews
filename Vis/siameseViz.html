@@ -303,8 +303,52 @@
         container.select("#hideBtn").text("");
     }
 
+    function linearRegression(independent, dependent){
+        let lr = {};
+        let independent_mean = arithmeticMean(independent);
+        let dependent_mean = arithmeticMean(dependent);
+        let products_mean = meanOfProducts(independent, dependent);
+        let independent_variance = variance(independent);
+        lr.a = (products_mean - (independent_mean * dependent_mean) ) / independent_variance;
+        lr.b = dependent_mean - (lr.a * independent_mean);
+        return lr;
+    }
+
+    function arithmeticMean(data){
+        let total = 0;
+        // note that incrementing total is done within the for loop
+        for(let i = 0, l = data.length; i < l; total += data[i], i++);
+        return total / data.length;
+    }
+
+    function meanOfProducts(data1, data2){
+        let total = 0;
+        // note that incrementing total is done within the for loop
+        for(let i = 0, l = data1.length; i < l; total += (data1[i] * data2[i]), i++);
+        return total / data1.length;
+    }
+
+    function variance(data){
+        let squares = [];
+        for(let i = 0, l = data.length; i < l; i++){
+        squares[i] = Math.pow(data[i], 2);
+        }
+        let mean_of_squares = arithmeticMean(squares);
+        let mean = arithmeticMean(data);
+        let square_of_mean = Math.pow(mean, 2);
+        let variance = mean_of_squares - square_of_mean;
+        return variance;
+    }
+
     function scatter(x,y, container, title){
-        
+        let lr = linearRegression(x,y);
+        let slope = lr.a;
+        let intercept = lr.b;
+        let x1 = 0;
+        let x2 = Math.max(...x);
+        let y1 = intercept;
+        let y2 = slope*(Math.max(...x))+intercept;
+
         let xScale = d3.scaleLinear()
             .domain(d3.extent(x))
             .range([0, 300]);
@@ -345,7 +389,15 @@
                 .attr("fill", "#f7e474")
                 .attr("opacity", "0.7")
                 .attr("T", (d,i)=> `${(d)}, ${(y[i])}`);
-
+        points
+			.append("line")
+			.attr("class", "trendline")
+			.attr("x1", xScale(x1))
+			.attr("y1", yScale(y1))
+			.attr("x2", xScale(x2))
+			.attr("y2", yScale(y2))
+			.attr("stroke", "black")
+			.attr("stroke-width", 1);
         container.append("text")
             .text(`Headline ${title}`)
             .attr("transform", `translate(${320}, ${305})`)
