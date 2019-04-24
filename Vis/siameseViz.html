@@ -1,65 +1,196 @@
 <html>
     <script src="https://d3js.org/d3.v4.min.js"></script>
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
-
-    <div id="my_dataviz"></div>
-
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
     <style>
     /* Add your CSS styles here! */
-    .cell{
+    body{
         width:80%;
+        margin:auto;
+    }
+    .cell{
+        width:100%;
         margin:auto;
         margin-bottom:10px;
         border-radius:5px;
         -webkit-box-shadow: -4px 4px 5px -3px rgba(0,0,0,0.75);
         -moz-box-shadow: -4px 4px 5px -3px rgba(0,0,0,0.75);
         box-shadow: -4px 4px 5px -3px rgba(0,0,0,0.75);
-        padding:5px;
+        padding:5px 10px;
         border-radius: 8px 8px 8px 8px;
         -moz-border-radius: 8px 8px 8px 8px;
         -webkit-border-radius: 8px 8px 8px 8px;
         border: 1px solid #0000003a;
     }
+    .fullText{
+        display:inline;
+    }
+    .xAxis, .yAxis{
+        font-size:0.4em;
+    }
+    .controls{
+        height:320px;
+        margin:40px auto;
+    }
+    .scatter{
+        width:50%;
+        text-align:center;
+        margin:40px auto;
+    }
+    .headlineText{
+        font-weight: 700;
+    }
+
     </style>
     <body>
+        <div class="row">
+                <div class="controls col-md">
+                        <h2>Comparing Activations of Headline and Body Branches</h2>
+                        <h5>Select a Feature to Compare</h5>
+                        <div class="dropdown">
+                                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="dropdownMenuButton"
+                                 data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    Features
+                                </button>
+                                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                                    <a class="dropdown-item" href="#" onclick="updateView(0);return false;">Highest Magnitude Response</a>
+                                    <a class="dropdown-item" href="#" onclick="updateView(1);return false;">Lowest Magnitude Response</a>
+                                    <a class="dropdown-item" href="#" onclick="updateView(2);return false;">Highest Variance in Reponse</a>
+                                    <a class="dropdown-item" href="#" onclick="updateView(3);return false;">Lowest Variance in Reponse</a>
+                                    <a class="dropdown-item" href="#" onclick="updateView(4);return false;">All Cells</a>
+                                </div>
+                        </div>
+                </div>
+                <div class="scatter col-md"></div>
+        </div>
+        <div class="cellsViz">
+            <h5 class="attrTitle"></h5>
+            <ul class="pagination" id="pag1">
+                <li class="page-item">
+                <a class="page-link" href="#" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                    <span class="sr-only">Previous</span>
+                </a>
+                </li>
+                <li class="page-item"><a class="page-link" href="#">1</a></li>
+                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                <li class="page-item"><a class="page-link" href="#">4</a></li>
+                <li class="page-item"><a class="page-link" href="#">5</a></li>
+                <li class="page-item">
+                <a class="page-link" href="#" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                    <span class="sr-only">Next</span>
+                </a>
+                </li>
+            </ul>
+            <div class="headlineCells"></div>
+
+            <h5 class="attrTitle"></h5>
+            <ul class="pagination" id="pag2">
+                <li class="page-item">
+                <a class="page-link" href="#" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                    <span class="sr-only">Previous</span>
+                </a>
+                </li>
+                <li class="page-item"><a class="page-link" href="#">1</a></li>
+                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                <li class="page-item"><a class="page-link" href="#">4</a></li>
+                <li class="page-item"><a class="page-link" href="#">5</a></li>
+                <li class="page-item">
+                <a class="page-link" href="#" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                    <span class="sr-only">Next</span>
+                </a>
+                </li>
+            </ul>
+            <div class="bodyCells"></div>
+
+        </div>
+        
     <script>
+    $('.dropdown-toggle').dropdown();
 
     var margin = {top: 200, right: 25, bottom: 30, left: 200},
       width = 450 - margin.left - margin.right,
       height = 450 - margin.top - margin.bottom;
-  //
-  var tooltip = d3.select("#my_dataviz")
-    .append("div")
-    .style("opacity", 0)
-    .attr("class", "tooltip")
-    .style("background-color", "white")
-    .style("border", "solid")
-    .style("border-width", "2px")
-    .style("border-radius", "5px")
-    .style("padding", "5px")
-  //
-          // Three function that change the tooltip when user hover / move / leave a cell
-      var mouseover = function(d) {
-        tooltip
-          .style("opacity", 1)
-        d3.select(this)
-          .style("stroke", "black")
-          .style("opacity", 1)
-      }
-      var mousemove = function(d) {
-        tooltip
-          .html("The activation value of<br>this cell is: " + d.PetalWidthCm)
-          .style("left", (d3.mouse(this)[0]+70) + "px")
-          .style("top", (d3.mouse(this)[1]) + "px")
-      }
-      var mouseleave = function(d) {
-        tooltip
-          .style("opacity", 0)
-        d3.select(this)
-          .style("stroke", "none")
-          .style("opacity", 0.8)
-      }
+    let text, bodyScale, headScale, actData;
 
+    // Three function that change the tooltip when user hover / move / leave a cell
+    function mouseover_word(word_act, groupID){
+        d3.select(`#${groupID}-cellWordAct`)
+            .text(word_act);
+    }
+    function mouseleave_word(groupID){
+        d3.select(`#${groupID}-cellWordAct`)
+            .text("0");
+    }
+
+    // TODO: Add controls to select a headline/body to look at 
+    // TODO: Extract classification result so that can compare samples that are/n't classified correctly 
+    function updateView(n){
+        console.log(n);
+        console.log(actData);
+        d3.select(".scatter").select("svg").remove();
+
+        switch(n){
+            case 0: // Highest mag resposne
+                showAttr(actData, headScale, bodyScale, "Highest Magnitude Response", "top5_mag");
+                break;
+            case 1: // Lowest mag response
+                showAttr(actData, headScale, bodyScale, "Lowest Magnitude Response", "bot5_mag");
+                break;
+            case 2: // Highest var response
+                showAttr(actData, headScale, bodyScale, "Highest Variance Response", "top5_var");
+                break;
+            case 3: // Lowest var response
+                showAttr(actData, headScale, bodyScale, "Lowest Variance Response", "bot5_var");
+                break;
+            case 4:
+                break;
+        }
+
+        if(n <=1){
+            let mag_h = [], mag_b = [];
+            actData["activations"].forEach(function(d,i){
+                var h = (d3.sum(
+                actData["activations"][i]["headline"]
+                    .map(d=> Number(Object.values(d)[0])**2)))**0.5;
+                var b = (d3.sum(
+                    actData["activations"][i]["body"]
+                        .map(d=> Number(Object.values(d)[0])**2)))**0.5;
+                mag_h.push(h);
+                mag_b.push(b);
+            });
+            let scatter_cont = d3.select(".scatter").append("svg")
+                .attr("width", "320")
+                .attr("height", "320");
+                scatter(mag_h, mag_b, scatter_cont, "Activation Magnitude");
+        }
+        else if(n<=3){
+            let var_h = [], var_b = [];
+            actData["activations"].forEach(function(d,i){
+                var h = (d3.variance(
+                actData["activations"][i]["headline"]
+                    .map(d=> Number(Object.values(d)[0]))));
+                var b = (d3.variance(
+                    actData["activations"][i]["body"]
+                        .map(d=> Number(Object.values(d)[0]))));
+                var_h.push(h);
+                var_b.push(b);
+            });
+            let scatter_cont = d3.select(".scatter").append("svg")
+                .attr("width", "320")
+                .attr("height", "320");
+                scatter(var_h, var_b, scatter_cont, "Activation Variance");
+        }
+    }
     /**
      * Gets range of activation values for a single list of key/value pairs, where the values are the range we want. 
      * data:list of all key-value pairs, ie. need to do separately for headline/bpdy 
@@ -81,9 +212,8 @@
         return range;
     }
 
-
     async function showPair(cell, headColor, bodyColor, groupID){
-        console.log(cell);
+        //console.log(cell);
         let headlines = cell["headline"];
         let body=cell["body"];
 
@@ -100,12 +230,13 @@
             //console.log(key2, value2);
             d[key2] = value2;
         });
-        var headline_container = d3.select(`#${groupID}`).append("div")
+        var cell_container =  d3.select(`#${groupID}`);
+        var headline_container = cell_container.append("div")
                 .attr("class", "headline")
                 //.style("margin-bottom", "10px")
                 .style("margin-top", "10px");
 
-        var body_container = d3.select(`#${groupID}`).append("div")
+        var body_container = cell_container.append("div")
             .attr("class", "body")
             .style("margin-bottom", "10px")
             .style("margin-top", "0px");
@@ -117,83 +248,158 @@
 
                 // Append the word for element d onto headline_container
                 headline_container.append("span")
-                    .attr("T", i) // The index of the current word in the headline
+                    .attr("T", value) // The index of the current word in the headline
                     .text(key)
-                    .style("background-color", headColor(value));
-                    //.on("mouseover", mouseover)
-                    //.on("mousemove", mousemove)
-                    //.on("mouseleave", mouseleave);
+                    .style("background-color", headColor(value))
+                    .on("mouseover", _ => mouseover_word(value, groupID))
+                    .on("mouseleave", _ => mouseleave_word(groupID))
+                    .attr("class", "headlineText");
 
                 // Add a space between each word
                 headline_container.append("span").text(" ");
             });
             resolve("");
         });
-        h.then(d=>{
+        var b = h.then(d=>{
             body.forEach(function(d,i){
             var key2 = Object.keys(d)[0];
             var value2 = Number(Object.values(d)[0]);
 
             // Append the word for element d onto headline_container
             body_container.append("span")
-                .attr("T", i) // The index of the current word in the headline
+                .attr("T", value2) // The index of the current word in the headline
                 .text(key2)
-                .style("background-color", bodyColor(value2*10));
-            // .on("mouseover", mouseover)
-            // .on("mousemove", mousemove)
-            // .on("mouseleave", mouseleave)
+                .style("background-color", bodyColor(value2))
+                .on("mouseover", _ => mouseover_word(value2, groupID))
+                .on("mouseleave", _ => mouseleave_word(groupID));
 
             // Add a space between each word
             body_container.append("span").text(" ");
             });
         });
+        b.then(d=>{
+            //body_container.append("p").text(text).attr("class", "fullText");
+            body_container.append("p")
+                .text("...")
+                .on("click", d=> showFullText(body_container))
+                .attr("class", "fullText");
+            body_container.append("span").attr("id","hideBtn");
+            
+            var header = cell_container.append("div").attr("class", `${groupID}-cellHeader`);
+            header.append("span").text(`Cell ${groupID.split("-")[1]} | Word Activation: `);
+            header.append("span").text("0.0").attr("id",`${groupID}-cellWordAct`); // Will be used to show the current word's activation;
+        });
+
     }
 
-
-//function, loop through
-    const requestData = async () =>{
-
-        const data = await d3.json("activations_Siamese.json");
-        //let cell = data[0]; // work with just one cell for now
-
-        //console.log(cell["headline"]);
-
-        //let headlines = cell["headline"];
-        //let body1=cell["body"];
-
-        var myColor = d3.scaleSequential()
-            .interpolator(d3.interpolateRdYlBu)
-            .domain([-1,1]); // could benefit from having a better domain, will make changes more distinct
-
-        console.log(data);
-        for(let i = 0; i<data["activations"].length; i++){
-            console.log(i);
-            showPair(data["activations"][i], myColor);
-        } 
+    function showFullText(container){
+        container.select("p").text(text);
+        container.select("#hideBtn").text("[Hide]")
+            .on("click", d=> {hideFullText(container)});
     }
-    //requestData();
+    function hideFullText(container){
+        container.select("p").text("...")
+            .on("click", d=> showFullText(container));
+        container.select("#hideBtn").text("");
+    }
+
+    function scatter(x,y, container, title){
+        
+        let xScale = d3.scaleLinear()
+            .domain(d3.extent(x))
+            .range([0, 300]);
+
+        // Uncomment if we think it's worth to switch up the scales on the viewer
+        /*if(title.indexOf("Variance")>=0){
+            xScale = d3.scaleLog()
+            .domain(d3.extent(x))
+            .range([0, 300]);
+        }*/
+
+        let yScale = d3.scaleLinear()
+            .domain(d3.extent(y))
+            .range([300, 0]);
+
+        let x_axis = d3.axisBottom(xScale);
+        container.append("g")
+            .attr("class", "xAxis")
+            .attr("transform", `translate(${22}, ${305})`)
+            .call(x_axis)
+            .attr("color","grey");
+        let y_axis = d3.axisLeft(yScale);
+        container.append("g")
+            .attr("class", "yAxis")
+            .attr("transform", `translate(${22}, ${5})`)
+            .call(y_axis)
+            .attr("color","grey");
+
+        let points = container.append("g")
+                .attr("transform", `translate(${22}, ${5})`);
+        points.selectAll("circle")
+            .data(x)
+            .enter()
+            .append("circle")
+                .attr("r", 5)
+                .attr("cx", d => xScale(d))
+                .attr("cy", (d,i) => yScale(y[i]))
+                .attr("fill", "#f7e474")
+                .attr("opacity", "0.7")
+                .attr("T", (d,i)=> `${(d)}, ${(y[i])}`);
+
+        container.append("text")
+            .text(`Headline ${title}`)
+            .attr("transform", `translate(${320}, ${305})`)
+            .attr("text-anchor", "end")
+            .style("font-size", "0.7em");
+        container.append("text")
+            .text(`Body ${title}`)
+            .attr("transform", "rotate(90)translate(5,-23)")
+            .attr("text-anchor", "start")
+            .style("font-size", "0.7em");
+    }
 
     d3.json("activations_Siamese.json", function(data){
         var myColor = d3.scaleSequential()
             .interpolator(d3.interpolateRdYlBu)
             .domain([-1,1]); // could benefit from having a better domain, will make changes more distinct
 
-        var bodyScale = d3.scaleSequential()
+        bodyScale = d3.scaleSequential()
             .interpolator(d3.interpolateRdYlBu)
             .domain(getRange(data["activations"], false)); // could benefit from having a better domain, will make changes more distinct
 
-        var headScale = d3.scaleSequential()
+        headScale = d3.scaleSequential()
             .interpolator(d3.interpolateRdYlBu)
             .domain(getRange(data["activations"], true));
+        
+        text = data['remain_b'];
+        actData = data;
 
         // Shows all cells in one go
-        for(let i = 0; i<data["activations"].length; i++){
+        /*for(let i = 0; i<data["activations"].length; i++){
             //console.log(i);
-            d3.select("body").append("div").attr("id", `cell-${i}`).attr("class", "cell");
             showPair(data["activations"][i], headScale, bodyScale, `cell-${i}`);
-        }      
+        }  */  
+
+        updateView(0);
     })
-        
+
+    function showAttr(data, headScale, bodyScale, title, accessor){
+        d3.selectAll(".cell").remove();
+        let headlines = d3.selectAll(".attrTitle")["_groups"][0];
+        d3.select(headlines[0]).text(`${title}: Headline Branch`)
+            .style("margin-top","10px");
+        data["important_h"][accessor].forEach(function(cnum){
+            cnum = Number(cnum);
+            d3.select(".headlineCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
+            showPair(data["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
+        });
+        d3.select(headlines[1]).text(`${title}: Body Branch`);
+        data["important_b"][accessor].forEach(function(cnum){
+            cnum = Number(cnum);
+            d3.select(".bodyCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
+            showPair(data["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
+        });
+    }
     </script>
     </body>
 </html>

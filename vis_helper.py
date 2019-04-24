@@ -152,8 +152,8 @@ class Vis_Helper():
         return {
             "bot5_mag":[str(i) for i in output3_norm[:5]],
             "top5_mag":[str(i) for i in output3_norm[-5:]],
-            "top5_var":[str(i) for i in output3_var[:5]],
-            "bot5_var":[str(i) for i in output3_var[-5:]],
+            "bot5_var":[str(i) for i in output3_var[:5]],
+            "top5_var":[str(i) for i in output3_var[-5:]],
             "top5_corr":[[str(i[0]), str(i[1])] for i in cov_pairs]
         }
 
