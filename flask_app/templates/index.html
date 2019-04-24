@@ -56,30 +56,128 @@
             padding: 20;
             border: none;
         }
+
+        #btnContainer {
+            margin: auto;
+        }
+
+        #formContainer {
+            margin: auto;
+        }
+
+        #headlineInput {
+            width: 60vw;
+        }
+
+        #bodyInput {
+            width: 60vw;
+            height: 40vh;
+        }
     </style>
     <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 
 <body>
-        <div class="card centered" width = "400" height = "700">
-            <h1>CDS Insights - Fake News Project - Relevance Detection
-            Visualization</h1> 
-            <div class = "row justify-content-center">
-                <div class = "card text-center" width = 400>Type in an article headline to look up all the article bodies paired
-                with that headline, or choose 5 random article/headline pairs. This
-                visualization displays the features we used in our algorithm to predict
-                relevance, which is the cosine similarity values of the first and most
-                significant sentence compared to the article headline. </div>
-            </div>
+    <div class="card centered" width="400" height="700">
+        <h1>CDS Insights - Fake News Project Visualization</h1>
+        <div class="row justify-content-center">
+            <div class="card text-center" width=400>Type in an article headline and article body (or select one of the
+                examples) and press submit. </div>
         </div>
-        <div id="all">
+        <div id="btnContainer">
+            <span><button id="exUnrelated" class="btn btn-info">Unrelated Example</button></span>
+            <span><button id="exAgree" class="btn btn-info">Agree Example</button></span>
+            <span><button id="exDisagree" class="btn btn-info">Disagree Example</button></span>
+            <span><button id="exDiscuss" class="btn btn-info">Discuss Example</button></span>
         </div>
-    </body>
+        <br>
+        <div id="formContainer">
+            <form>
+                <input type="text" id="headlineInput" name="headlineInput" class="form-control"
+                    placeholder="Type a headline/claim here">
+                <br>
+                <textarea id="bodyInput" name="bodyInput" class="form-control"
+                    placeholder="Type an article body here"></textarea>
+                <br>
+                <button type="submit" class="btn btn-info">Submit</button>
+            </form>
+        </div>
+    </div>
+    <div id="all">
+    </div>
+</body>
 <script>
-    function jsonEscape(str) {
-        return str.replace(/\n/g, "\\\\n").replace(/\r/g, "\\\\r").replace(/\t/g, "\\\\t");
+    var exampleHeadline = "Woman detained in Lebanon is not al-Baghdadi's wife, Iraq says";
+
+    var exampleDisagree =
+        "Wanted: Islamic State group chief Abu Bakr al-Baghdadi, who has a $US10 million price on his head, delivers a sermon at a mosque in Iraq in July. Photo: AP\n\nBeirut: The second wife of Islamic State leader Abu Bakr al-Baghdadi is under interrogation in military detention in Lebanon after she was arrested in the north of Lebanon 10 days ago, security officials revealed on Tuesday.\n\nIt is unclear whether she was fleeing the self-proclaimed caliph of the extremist Sunni group, or if she remains loyal to Baghdadi and was simply in hiding, experts said.\n\nWorking with Western intelligence services, the Lebanese army tracked Saja Hamid al-Dulaimi, an Iraqi citizen, and her son to an undisclosed location north of the strife-ridden city of Tripoli, one official who spoke on the condition of anonymity said. Another source said she was captured in the northern border town of Arsal.\n\nA young Syrian refugee walks past tents at the al-Nihaya camp in the eastern Lebanese town of Arsal, where some reports say Saja Hamid al-Dulaimi and her son were arrested. Photo: AFP\n\nHer capture and detention could prove to be a significant setback for Baghdadi as she may be used as leverage to negotiate the release of the many prisoners – both foreign, Iraqi and Syrian – that the Islamic State is holding.\n\nLebanese security officials also hope her capture could be the breakthrough needed to secure the release of at least 26 Lebanese soldiers kidnapped by IS and Nusra Front militants in August.\n\nA DNA test had confirmed the child, believed to be nine years old, is Baghdadi's son, the Lebanese al-Safir newspaper said, citing security officials.\n\nIt is believed Baghdadi's DNA may have been taken by US officials during the nine months he was held in an American-run prison in Iraq in 2004 after his capture in Fallujah\n\nHowever in a sign of the confusion surrounding the arrests, some media sources reported the child in custody was a girl.\n\nDulaimi was one of 140 women released from a Syrian government jail in March this year as part of a prisoner swap that led to the release of 13 Greek Orthodox nuns held by al-Qaeda-linked Nusra Front in the Syrian town of Maaloula.\n\nSince her release she is believed to have moved around the border area between Lebanon and Syria, sticking mostly to the mountainous territory held by the Nusra Front, said Mario Abou Zeid, a research analyst with the Carnegie Middle East Centre in Beirut.  \"\"She was infiltrating the Lebanese borders, moving inside and outside Lebanon with fake IDs … in the area controlled by Nusra Front,\"\" Mr Abou Zeid said. \"\"She maintained a very low profile, protecting herself and her son.\"\"  He warned that Dulaimi's capture, while an important step, may be of limited value to intelligence services given the Islamic State was renowned for ensuring operational matters were never discussed outside a very tight inner circle.  \"\"The main pillar of their success is to minimise the amount of information anyone can have access to.  \"\"Some may think she has all the secrets of Baghdadi, even though she was captured in the Syrian regime and since her release she has been almost completely cut off from Baghdadi, on the run along the Lebanese-Syrian border.\"\"  It is possible Dulaimi had been away from Baghdadi for so long that her information may be of little worth and her decision to relocate to Lebanon \"\"could have been a defection from Baghdadi, she could have been fleeing\"\", Mr Abou Zeid told Fairfax Media.  She is being questioned by investigators at the headquarters of the Lebanese defence ministry in the Yarze district, north of Beirut, the unnamed official said.  There is no doubt the counter-terrorism operation, which involved both Lebanese, US and European intelligence agencies, will prove useful, said retired Lebanese general and security analyst, Elias Farhat.  \"\"She is one of the wives of the so-called caliph of the Islamic State … she will be useful in the negotiations between the Lebanese authorities as IS and Jabhat al-Nusra in relation to the kidnapped soldiers,\"\" General Farhat said.  \"\"Her capture is one of the successful outcomes of cooperation between Lebanese and Western intelligence agencies.\"\"  But even as news of Dulaimi's capture broke over Lebanon, local media reported late on Tuesday that militants had attacked a Lebanese army patrol in Ras Baalbek, with a four-man unit feared harmed or kidnapped.  It is believed Baghdadi became head of the Islamic State of Iraq, a predecessor to IS, in 2010. It then expanded into Syria in 2013 and in June Islamic State militants took control of Iraq's second city of Mosul before moving south towards the capital.  There were reports last month that he had been killed in US-led airstrikes in Iraq, although soon after the Islamic State released a recording on November 13 – purportedly by Baghdadi – in which he called for \"\"volcanos of jihad\"\" to be unleashed over the world.\n\nThe US Government has offered a $US10 million ($11.84 million) reward for his capture.";
+
+    var exampleDiscuss =
+        "Lebanese authorities are holding a daughter and an ex-wife of the head of the ISIS jihadist group, Abu Bakr al-Baghdadi, the interior minister said. It was initially reported that a wife and son of the self-proclaimed “caliph” had been arrested in November.\nThe woman, who has been named as Saja al-Dulaimi, was travelling with two sons and a daughter, interior minister Nouhad Mashnuq told the Lebanese MTV channel late Wednesday. He said DNA tests showed that the girl was Baghdadi’s child.\n“Dulaimi is not Abu Bakr al-Baghdadi’s wife currently. She has been married three times: first to a man from the former Iraqi regime, with whom she had two sons,” he said.\n“Six years ago she married Abu Bakr al-Baghdadi for three months, and she had a daughter with him. Now, she is married to a Palestinian and she is pregnant with his child,” Mr Mashnuq added.\n“We conducted DNA tests on her and the daughter, which showed she was the mother of the girl, and that the girl is his (Abu Bakr al-Baghdadi’s) daughter, based on DNA from Baghdadi from Iraq,” Mr Mashnuq said.\"\n2156,\"A soldier has been shot at Ottawa's War Memorial in Canada, near the parliament, after a gunman opened fire.\n\nThe soldier was being treated by paramedics and police rushed on the scene.\n\nWitnesses told CBC News that the suspected shooter was carrying rifle.\n\nThe Canadian parliament building was reported to be in lockdown following the shooting. Police have cordoned the area and blocked access to Parliament Hill.\n\nOther reports said shots were fired inside the parliament.\n\nRT @storyfulpro: CANADA: @josh_wingrove A body outside ground at library of parliament pic.twitter.com/LcUfNzKSdj— Ben Fenton (@benfenton) October 22, 2014\n\nPolice say that they have located car belonging to suspect and advised people to stay away from Parliament HIll due to the ongoing incident. Canadian prime minister Stephen Harper was said to be safe and evacuated the building after the shooting. At least 20 shots were shots in Canada parliament, according to witnesses.\n\nA Globe and Mail journalist said that \"\"dozens of shots\"\" have been fired inside of the Canadian parliament. Other reports said the man was wearing a long dark coat and had a \"\"Middle Eastern scarf covering his face\"\".\n\nWitness said man had a long rifle, dark coat, wearing what was described as a Middle Eastern scarf covering his face. #cdnpoli #ottnews— Jordan Press (@jpress) October 22, 2014\n\nA Canadian member of parliament tweeting from inside the building, Malcom Allen, said that shots were heard inside caucus room in centre block:\n\nWe're now in lock down on the hill as shots were heard outside our caucus room in centre block— Malcolm Allen (@Malcolm_AllenMP) October 22, 2014\n\nJustin Ling, Ottawa bureau chief for Hyperpartisans Weekly, who is inside parliament building, tweeted that there could more than one shooter:\n\nObviously, reports that active gunman was killed. But we all saw reports of second gunman.— Justin Ling (@Justin_Ling) October 22, 2014\n\nThe report seems to be confirmed by CBS, which quoted Ottawa Police as saying that multiple suspects are at large in the shooting.\n\nTwo MPs tweeted that the gunman has been killed by police.\n\nThe attack came a day after a 25-year-old Muslim convert was shot dead by police after he killed a Canadian solider and injured a second near Montreal.\n\nPolice said the man, Martin Couture Rouleau had recently become influenced by radical Islam, with friends suggesting he acted in response to an appeal by the Isis (Islamic State) group for jihadi sympathisers across the world to launch 'lone wolf' attacks on westerners \"\"wherever they can be found\"\".\n\nCanada raised the terror threat level in the country from low to medium following the attack.\n\nRelatedCanada Raises Terror Threat Level Because of Isis 'Lone Wolf' Attack on Two SoldiersCanada: Isis 'Lone Wolf' Killer Martin Couture Rouleau Mows Down Soldiers with Car\n\nMORE TO FOLLOW...";
+
+    var exampleAgree =
+        "An Iraqi official denied that a woman detained in Lebanon is a wife of Abu Bakr al-Baghdadi, the leader of the Islamic State group, adding that she is the sister of a terror suspect being held in Iraq.\n\nWednesday's denial comes a day after Lebanese authorities said they are holding a woman believed to be al-Baghdadi's wife.\n\nThey said she was detained for travelling with a fake ID and had herself claimed that she is the reclusive extremist leader's spouse.\n\nThis file image made from video posted on a militant website purports to show the leader of the Islamic State group, Abu Bakr al-Baghdadi, delivering a sermon at a mosque in Iraq\n\nThe statement by Iraq's Interior Ministry spokesman Saad Maan Ibrahim adds to the confusion surrounding the identity of the woman and child who were detained about 10 days ago in northern Lebanon travelling with a fake ID.\n\nLebanese officials said the woman, Saja al-Dulaimi, is believed to be the wife of the reclusive IS leader. She was held by Syrian authorities and freed in a prisoner exchange with the Nusra Front, Syria's al-Qaida branch, earlier this year.\n\nThe interrogation of the woman was being supervised by Lebanon's military prosecutor.\n\nIt was unclear what would have brought the woman and child to Lebanon, where IS controls no territory and enjoys only small support in some predominantly Sunni Muslim areas.\n\nOn Wednesday, Ibrahim told The Associated Press that al-Dulaimi, an Iraqi national who traveled to Syria before arriving in Lebanon, is not al-Baghdadi's wife. He identified her as the sister of Omar Abdul Hamid al-Dulaimi, who is being held in Iraq as a terror suspect.\n\nHe added that al-Baghdadi has two wives but neither is named Saja al-Dulaimi. There was no immediate comment from Lebanese authorities.\n\nIn Lebanon, a military expert was killed and two others wounded Wednesday when a bomb they were about to dismantle near the border with Syria exploded, the army said.\n\nThe explosion comes a day after an ambush by suspected Islamic militants in the same area killed six soldiers and wounded one.\n\nIn Lebanon, a military expert was killed and two others wounded Wednesday when a bomb they were about to dismantle near the border with Syria exploded. Lebanese soldiers are pictured here patrolling the area\n\nLebanese troops (pictured) have been battling Syria-based Islamic militants, including the extremist Islamic State group and the al-Qaida-linked Nusra Front, in areas near the border\n\nNo one has so far claimed responsibility for Tuesday's ambush or for planting the bomb that was discovered Wednesday.\n\nLebanese troops have been battling Syria-based Islamic militants, including the extremist Islamic State group and the al-Qaida-linked Nusra Front, in areas near the border.\n\nMeanwhile, Saudi Arabia's Interior Ministry spokesman said police have not ruled out the possibility that Islamic State group supporters were behind the shooting of a Danish man last month.\n\nIt was the first time a Saudi official publicly comments on the incident since a video was released by alleged IS supporters claiming responsibility for the drive-by shooting in Riyadh Nov. 22. The Danish citizen survived the shooting.\n\nInterior Ministry spokesman Mansour al-Turki's comments were published Wednesday in the Saudi Al-Eqtisadia newspaper.\n\nThe video was released online this week by a group purporting to be IS supporters. It shows a gunman pulling up beside a vehicle and firing at the driver. It identifies the target as Thomas Hoepner. It was not immediately possible to confirm the authenticity of the video.\n\nLebanese army special forces in armored personnel carriers patrol near the area militants ambushed Lebanese soldiers";
+
+    var exampleUnrelated =
+        "Prepare to meet ... mite man.\n\nDoctors removed a matchhead-sized insect, believed to be a spider, from under Dylan Thomas’s skin earlier this week and have sent the creature away for testing to determine what it is.\n\nIt had been there for three days and burrowed up to his chest, leaving a trail of red blisters.\n\nThe 21-year-old was on his first trip to Bali.\n\nHe told News Corp yesterday that doctors had pulled a tropical spider “a bit bigger than the size of a match head” from his skin.\n\nThere’s just one problem.\n\nSpiders, according to Perth arachnid expert Dr Volker Framenau, don’t burrow in skin.\n\n“They don’t have the tools, the armature, to do this sort of stuff,” Dr Framenau said.\n\n“I find it highly unlikely, almost impossible, that it was a spider.’\n\nMore likely, Dr Framenau said, was some kind of burrowing mite.\n\n“That’s a professional skin-digger,” he said.\n\n“There’s a lot of nasty stuff out there.”\n\nThe results of the tests on the creature should come back next week.\n\nMr Thomas has been contacted for comment.\"\n988,\"Joe Riquelme, an app developer from New York, surprised his parents with a special gift on Christmas Day: he paid off their mortgage.\n\nIn a video he uploaded to YouTube, Joe is sitting at home with his parents and their dog, when he presents them with an envelope.\n\nyoutube.com\n\nInside, a simple letter reads:\n\nfacebook.com\n\nWhen his parents realise what Joe has done, they are moved to tears.\n\nyoutube.com\n\nyoutube.com\n\nWhile Joe’s dad weeps, his mother cries, “Oh thank you. I love you”.\n\nyoutube.com\n\nThe touching video Joe uploaded to YouTube on December 26th has since had almost 2 million views.\"\n989,\"Industry sources indicate Apple is planning to lean heavily on Samsung as a component supplier for both new iPhone 6 builds and the upcoming Apple Watch, reports BusinessKorea (via G for Games). If true, this would be a marked change from Apple's reported goal of lessening its reliance on Samsung by seeking alternative suppliers for critical hardware components.\n\nAccording to the report, Apple is looking to Samsung to supply RAM, NAND flash storage, and batteries for future iPhone 6 production, supplementing or replacing current suppliers for those components.\n\nNAND flash has been a particular area of concern for Apple according to recent news reports, with the company's decision to use cheaper and slower TLC (triple-level cell) flash memory for larger-capacity iPhone 6 and 6 Plus models being blamed for sporadic crashing issues. Apple has reportedly moved to stop the use of its current TLC NAND flash chips and supposedly is back at the negotiating table with the South Korean supplier.At first, Apple discussed with Samsung about the supply of NAND flash for the iPhone 6. Due to problems with prices, Toshiba's TLC NAND flash was used in the 128GB models, and components made by SK Hynix, Toshiba, and SanDisk were used in the 64GB models.\n\nHowever, as overseas IT news sites reported functional defects in the 128GB models, Apple is said to be considering whether or not to replace the TLC NAND flash made by Toshiba with Samsung's own TLC NAND flash. If Apple and Samsung strike a deal, Samsung will supply both DRAM and NAND flash to the iPhone 6.Beyond the iPhone 6, the same Korean industry sources also claim Samsung will supply Apple with application processors for the Apple Watch, which is slated to debut in early 2015.\n\nApple touts the Apple Watch as using a new \"\"S1\"\" module for the internals that seals nearly all of the internal components into a single resin-filled package for durability. The individual components of the S1 are undoubtedly being provided by several different manufacturers, but according to today's report the main application processor portion will be coming from Samsung.\n\nRelated roundups: iPhone 6, iPhone 6s (2015), Apple Watch";
+
+    var headlineInput = d3.select("#headlineInput");
+    var exUnrelated = d3.select("#exUnrelated");
+    var exAgree = d3.select("#exAgree");
+    var exDisagree = d3.select("#exDisagree");
+    var exDiscuss = d3.select("#exDiscuss");
+
+    function fillInputs(h, b) {
+        headlineInput.attr("value", h);
+        document.getElementById("bodyInput").value = b;
     }
-    var response = JSON.parse(jsonEscape('{{ data | tojson | safe }}'));
+
+    exUnrelated.on("click", () => fillInputs(exampleHeadline, exampleUnrelated));
+    exAgree.on("click", () => fillInputs(exampleHeadline, exampleAgree));
+    exDisagree.on("click", () => fillInputs(exampleHeadline, exampleDisagree));
+    exDiscuss.on("click", () => fillInputs(exampleHeadline, exampleDiscuss));
+</script>
+<script>
+    let negating_words = [
+        "n't", "not", "no",
+        "never", "nobody", "non", "nope"
+    ];
+    let doubting_words = [
+        'fake', 'fraud', 'hoax',
+        'false', 'deny', 'denies',
+        'despite', 'doubt',
+        'bogus', 'debunk', 'prank',
+        'retract', 'scam', "withdrawn",
+        "misinformation"
+    ];
+    let hedging_words = [
+        'allege', 'allegedly', 'apparently',
+        'appear', 'claim', 'could',
+        'evidently', 'largely', 'likely',
+        'mainly', 'may', 'maybe', 'might',
+        'mostly', 'perhaps', 'presumably',
+        'probably', 'purport', 'purportedly',
+        'reported', 'reportedly',
+        'rumor', 'rumour', 'rumored', 'rumoured',
+        'says', 'seem', 'somewhat',
+        'unconfirmed'
+    ];
+    let subject_check = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "compound"];
+    let subjects = [];
+    let nd_nodes = {}; //negating/doubting words
+    let curr_subjects = {}; //subjects for each offset
+
+    var dtwidth = window.innerWidth,
+        dtheight = 650,
+        dtsvg;
+
+    function jsonEscape(str) {
+        console.log(str);
+        return str.replace(/\n/g, "").replace(/\r/g, "").replace(/\t/g, "");
+    }
+    var respStr = jsonEscape('{{ data | tojson | safe }}');
+    console.log(respStr);
+    var response = JSON.parse(respStr);
 
     let width = 1000,
         height = 500;
@@ -250,8 +348,8 @@
         }
     }
 
-//custom cosine_sim function for bag of words
-    function cosine_sim(a,b){
+    //custom cosine_sim function for bag of words
+    function cosine_sim(a, b) {
         var vocab = [...new Set(a.concat(b))];
         var vocab_A = new Set(a);
         var vocab_B = new Set(b);
@@ -259,17 +357,17 @@
         var VA = vocab.map((e) => vocab_A.has(e) ? 1 : 0);
         var VB = vocab.map((e) => vocab_B.has(e) ? 1 : 0);
 
-        var dotproduct=0;
-        var mA=0;
-        var mB=0;
-        for(i = 0; i < VA.length; i++){
-            dotproduct += (VB[i]*VA[i]);
+        var dotproduct = 0;
+        var mA = 0;
+        var mB = 0;
+        for (i = 0; i < VA.length; i++) {
+            dotproduct += (VB[i] * VA[i]);
             mA += VA[i];
             mB += VB[i];
         }
         mA = Math.sqrt(mA);
         mB = Math.sqrt(mB);
-        var similarity = (dotproduct)/((mA)*(mB))
+        var similarity = (dotproduct) / ((mA) * (mB))
         return similarity;
     }
 
@@ -311,7 +409,55 @@
             let head = headline_data;
             let body = bodies[i];
             displayHead(head, body, index);
-            displayFeatures(head, body, index)
+            displayFeatures(head, body, index);
+            if (results[i] != "unrelated") {
+                dtsvg = d3.select("body").append("svg").attr("width", dtwidth).attr("height", dtheight);
+                var data = graphs[i].body;
+                data.unshift(graphs[i].headline);
+                console.log(data);
+                subjects = response.headline_subjs;
+                console.log(subjects);
+                data.forEach((d, i) => {
+                    drawDepTree(d, i);
+                });
+                var btndiv = d3.select("body").append("div")
+                .attr("class", "btn-group btn-group-toggle py-3").attr("data-toggle","buttons")
+                .style("margin","auto");
+                btndiv.append("button")
+                .attr("type","button").attr("class","btn btn-secondary border")
+                .attr("name","options").attr("id","option1").text("Root to Negating Word");
+                btndiv.append("button")
+                .attr("type","button").attr("class","btn btn-secondary border")
+                .attr("name","options").attr("id","option2").text("Ancestors/Siblings of Negating Words");
+                btndiv.append("button")
+                .attr("type","button").attr("class","btn btn-secondary border")
+                .attr("name","options").attr("id","option3").text("Subject to Negating Word");
+                btndiv.append("button").attr("type","button").attr("class","btn btn-secondary border")
+                .attr("name","options").attr("id","option4").text("Normal");
+                //colors
+                let colors = ["red", "orange", "purple", "black"];
+                //buttons
+                d3.select("#option1").on("click", function () {
+                    for (let i = 0; i < 6; i++) {
+                        negate_to_root(nd_nodes[i], colors[0], i);
+                    }
+                }).style("color", colors[0]).style("background-color","white");
+                d3.select("#option2").on("click", function () {
+                    for (let i = 0; i < 6; i++) {
+                        ancestors(nd_nodes[i], colors[1], i);
+                    }
+                }).style("color", colors[1]).style("background-color","white");
+                d3.select("#option3").on("click", function () {
+                    for (let i = 0; i < 6; i++) {
+                        neg_sub(nd_nodes[i], curr_subjects[i], colors[2], i);
+                    }
+                }).style("color", colors[2]).style("background-color","white");
+                d3.select("#option4").on("click", function () {
+                    d3.selectAll(".link").attr("stroke", "black");
+                    d3.selectAll(".link").attr("stroke-width", 1);
+                    d3.selectAll(".node").attr("stroke", "black");
+                }).style("color", colors[3]).style("background-color","white");
+            }
         }
 
         function displayHead(head, body, index) { //displaying headline
@@ -327,11 +473,6 @@
                     .style("font-size", "40px")
                     .style("background-color", function () {
                         return class_to_color(span_class);
-                    })
-                    .on("mouseover", function () {
-                        console.log(head);
-                        console.log(body);
-                        //debug
                     });
                 headline.append("span").text(" ").style("font-size", "40px");
             });
@@ -347,7 +488,7 @@
                 .style("height", function () {
                     return Math.max(100, Math.min(450, body.raw.length / 15));
                 })
-                .style("overflow", "auto").style("display","none");
+                .style("overflow", "auto").style("display", "none");
 
             let first_sentence = body.first_sentence.raw;
             let significant_sentence = body.significant_sentence.raw;
@@ -410,7 +551,7 @@
             })
 
             let type_container = article.append("div").attr("class", "row text-center")
-                .attr("id", `type_words${index}`).style("display","none");
+                .attr("id", `type_words${index}`).style("display", "none");
             let button_group = type_container.append("div")
                 .attr("class", "btn-group btn-group-toggle")
                 .attr("data-toggle", "buttons")
@@ -595,7 +736,7 @@
                 .on("click", function () {
                     var txt = d3.select(`#text${index}`);
                     var tw = d3.select(`#type_words${index}`);
-                    if (txt.style("display") == "none"){
+                    if (txt.style("display") == "none") {
                         txt.style("display", "block");
                         tw.style("display", "block");
                     } else {
@@ -603,9 +744,225 @@
                         tw.style("display", "none");
                     }
                 });
-            
+
             displayBody(head, body, index);
         }
+    }
+
+    //DEP TREES BELOW
+
+    //finds smallest path of sub/neg and returns the parent
+    function get_neg_sub(neg_nodes, curr_subs, offset) {
+        let min_par = "",
+            min_neg = "",
+            min_sub = "",
+            min_path = Number.MAX_SAFE_INTEGER - 1;
+        curr_subs.forEach(function (sub) {
+            neg_nodes.forEach(function (neg) {
+                let n_path = [];
+                let s_path = [];
+                let start_neg = neg,
+                    start_sub = sub;
+                let p_count = 0; //count how many levels path has to take
+                while (true) {
+                    p_count++;
+                    let ntoken = neg.data.token,
+                        stoken = sub.data.token;
+                    n_path.push(ntoken);
+                    s_path.push(stoken);
+                    if (neg.depth > sub.depth) { //if neg is lower
+                        if (s_path.includes(ntoken) && p_count < min_path) {
+                            min_path = p_count;
+                            min_par = neg;
+                            min_neg = start_neg;
+                            min_sub = start_sub;
+                            break;
+                        }
+                    } else if (sub.depth >= neg.depth) { //if sub is lower
+                        if (n_path.includes(stoken) && p_count < min_path) {
+                            min_path = p_count;
+                            min_par = sub;
+                            min_neg = start_neg;
+                            min_sub = start_sub;
+                            break;
+                        }
+                    }
+                    if (neg.parent !== null) neg = neg.parent;
+                    if (sub.parent !== null) sub = sub.parent;
+                    if (neg.parent === null && sub.parent === null) break; //nothing
+                }
+            })
+        })
+        return {
+            "parent": min_par,
+            "negative": min_neg,
+            "subject": min_sub
+        };
+    }
+
+    //draws path from sub to neg
+    function neg_sub(neg_nodes, curr_subs, color, offset) {
+        let results = get_neg_sub(neg_nodes, curr_subs);
+        let neg = results["negative"];
+        let sub = results["subject"];
+        let par = results["parent"];
+        if (par !== "") {
+            while (neg.data.token !== par.data.token) {
+                d3.select("#" + "link" + neg.data.idx + neg.parent.data.idx + offset)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 5);
+                d3.select("#" + "node" + neg.data.idx + offset)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 5);
+                neg = neg.parent;
+            }
+            d3.select("#" + "node" + neg.data.idx + offset).attr("stroke", color);
+            while (sub.data.token !== par.data.token) {
+                d3.select("#" + "link" + sub.data.idx + sub.parent.data.idx + offset)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 5);
+                d3.select("#" + "node" + sub.data.idx + offset)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 5);
+                sub = sub.parent;
+            }
+            d3.select("#" + "node" + sub.data.idx + offset).attr("stroke", color);
+        }
+    }
+
+    //draw path from neg node to root
+    function negate_to_root(neg_nodes, color, offset) {
+        if (neg_nodes.length === 0) {
+            return;
+        }
+        let curr_node = neg_nodes[0];
+        //iterate through neg nodes to find closest to root
+        neg_nodes.forEach(function (d) {
+            if (d.depth < curr_node.depth) {
+                curr_node = d;
+            }
+        })
+
+        while (curr_node.parent !== null) {
+            d3.select("#" + "link" + curr_node.data.idx + curr_node.parent.data.idx + offset)
+                .attr("stroke", color)
+                .attr("stroke-width", 5);
+            d3.select("#" + "node" + curr_node.data.idx + offset)
+                .attr("stroke", color)
+                .attr("stroke-width", 5);
+            curr_node = curr_node.parent;
+        }
+        d3.select("#" + "node" + curr_node.data.idx + offset)
+            .attr("stroke", color);
+    }
+
+    //for each nd node, get siblings and ancestors. - number of overlap of things that are being negated - 
+    // all parents up to node and other children of that parent, and the number of overlap
+    function ancestors(neg_nodes, color, offset) {
+        //find all the children of primary parent
+        negate_to_root(neg_nodes, color, offset);
+        neg_nodes.forEach(function (n) {
+            parenting = n.parent;
+            childs = parenting.children;
+            childs.forEach(function (child) {
+                d3.select("#" + "link" + child.data.idx + parenting.data.idx + offset)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 5);
+                d3.select("#" + "node" + child.data.idx + offset)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 5);
+            })
+        })
+    }
+
+    function drawDepTree(data, offset) {
+        if (offset === 0) {
+            dtwidth = window.innerWidth;
+        } else {
+            dtwidth = window.innerWidth / 5;
+        }
+        let vis_container = dtsvg.append("g").attr("transform",
+            `translate (${dtwidth * Math.max((offset-1),0)}, ${30 + Math.min(offset,1) * dtheight/2})`);
+        vis_container.append("text").text(function () {
+                if (offset === 0) return "Headline"
+                else return "Sentence " + offset;
+            })
+            .attr("x", 20)
+            .attr("y", 20)
+            .style("font-size", 20);
+        var vis = vis_container.append("g").attr("transform",
+            `translate (0, 20)`);
+        vis_container.append("rect").attr("x", 0).attr("y", 0) //border
+            .attr("height", dtheight / 2 - 30)
+            .attr("width", dtwidth)
+            .style("stroke", "black")
+            .style("fill", "none")
+            .style("stroke-width", 1);
+        var treemap = d3.tree().size([dtwidth - 30, dtheight / 2 - 60]);
+        var root = d3.hierarchy(data, (d) => d.children);
+        var treemap = treemap(root);
+        var nodes = treemap;
+        var links = treemap.descendants().slice(1);
+
+        vis.selectAll(".link")
+            .data(links)
+            .enter().append("path")
+            .attr("class", "link")
+            .attr("id", d => "link" + d.data.idx + d.parent.data.idx + offset)
+            .attr("fill", "none")
+            .attr("stroke-width",1)
+            .attr("stroke", "black")
+            .attr("d", function (d) {
+                return "M" + d.x + "," + d.y +
+                    "C" + d.x + "," + (d.y + d.parent.y) / 2 +
+                    " " + d.parent.x + "," + (d.y + d.parent.y) / 2 +
+                    " " + d.parent.x + "," + d.parent.y;
+            });
+
+        var node = vis.selectAll(".node")
+            .data(nodes.descendants())
+            .enter()
+            .append("g");
+
+        node.append("circle")
+            .attr("class", "node")
+            .attr("id", d => "node" + d.data.idx + offset)
+            .attr("fill", function (d) {
+                let token = d.data.token;
+                if (negating_words.includes(token)) {
+                    return "red";
+                } else if (doubting_words.includes(token)) {
+                    return "orange";
+                } else if (hedging_words.includes(token)) {
+                    return "yellow";
+                } else if (subjects.includes(token)) {
+                    return "blue";
+                }
+                return "gray";
+            })
+            .attr("stroke", "black")
+            .style("stroke-width", 1)
+            .attr("r", 5)
+            .attr("cx", (d) => d.x)
+            .attr("cy", (d) => d.y);
+
+        //identifies which nodes are negating/doubting, iterates to root and colors path
+        nd_nodes[offset] = [];
+        curr_subjects[offset] = [];
+        node.each(function (d) {
+            if (negating_words.includes(d.data.token) ||
+                doubting_words.includes(d.data.token)) {
+                nd_nodes[offset].push(d);
+            } else if (subjects.includes(d.data.token)) {
+                curr_subjects[offset].push(d);
+            }
+        });
+
+        node.append("text")
+            .text((d) => d.data.token)
+            .attr("x", (d) => d.x)
+            .attr("dx", 5)
+            .attr("y", (d) => d.y);
     }
 </script>
 

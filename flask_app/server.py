@@ -31,7 +31,7 @@ def classify_helper(headline, bodies):
         body_info.append((nlp_b, body_graph))
 
     features_rel = get_features_rel(headline_info_rel, body_info_rel)
-    features_stance, summary_graphs = get_features_stance(headline_info, body_info)
+    features_stance, summary_graphs, headline_subjs = get_features_stance(headline_info, body_info)
 
     rel_model = load('../saved_models/relevance_detection_trained.joblib')
     stance_model = load('../saved_models/stance_detection_trained.joblib')
@@ -47,39 +47,43 @@ def classify_helper(headline, bodies):
     result = {
         "headline": headline,
         "bodies": bodies,
-        "graphs": {
-            "headline": headline_edges,
-            "bodies": summary_graphs
-        },
+        "graphs": summary_graphs,
         "relevance_features": {
             "headline": headline_processed,
             "bodies": body_info_rel
         },
-        "predictions": predicted
+        "predictions": predicted,
+        "headline_subjs": [s for s in headline_subjs if s != "vocab_"]
     }
     return result
 
+# @app.route('/', methods = ['GET'])
+# def index():
+#     return render_template('index.html', data=[])
+
+# @app.route('/classify_multiple', methods = ['GET'])
+# def classify_multiple():
+#     headline = request.form.get('headline')
+#     stances = pd.read_csv("train_stances.csv")
+#     bodies = pd.read_csv("train_bodies.csv")
+#     def get_body(n):
+#         bodies.loc[lambda x: x["Body ID"] == n, "articleBody"].item()
+#     relevant_stances = stances[stances["Headline"]==headline]
+#     relevant_bodies = [get_body(i[1]) for i in relevant_stances.values()]
+#     results = classify_helper(headline, relevant_bodies)
+#     return render_template('index.html', data=results)
+
 @app.route('/', methods = ['GET'])
-def index():
-    return render_template('index.html', data=[])
-
-@app.route('/classify_multiple', methods = ['GET'])
-def classify_multiple():
-    headline = request.form.get('headline')
-    stances = pd.read_csv("train_stances.csv")
-    bodies = pd.read_csv("train_bodies.csv")
-    def get_body(n):
-        bodies.loc[lambda x: x["Body ID"] == n, "articleBody"].item()
-    relevant_stances = stances[stances["Headline"]==headline]
-    relevant_bodies = [get_body(i[1]) for i in relevant_stances.values()]
-    results = classify_helper(headline, relevant_bodies)
-    return render_template('index.html', data=results)
-
-@app.route('/classify', methods = ['GET'])
 def classify():
-    headline = request.form.get('headline')
-    body = request.form.get('body')
-    results = classify_helper(headline, [body])
+    headline = request.args.get('headlineInput').replace("'",'').replace('"','')
+    body = request.args.get('bodyInput').replace("'",'').replace('"','')
+    results = []
+    if not headline:
+        results = []
+    else:
+        print(headline)
+        print(body[:10])
+        results = classify_helper(headline, [body])
     return render_template('index.html', data=results)
 
 @app.route('/classify_test', methods = ['GET'])

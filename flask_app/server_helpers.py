@@ -69,6 +69,25 @@ def preprocess(text):
     text = text.replace("...", " ")
     return text
 
+def make_graph(token):
+    valid_children = [c for c in list(token.lefts)+list(token.rights) if c.dep_ != "SPACE"]
+    return {
+        "name": token.lemma_.lower() + str(token.i),
+        "token": token.lemma_.lower(),
+        "pos": token.pos_,
+        "dep": token.dep_,
+        "idx": token.i,
+        "children": [make_graph(c) for c in valid_children]
+    }
+
+def get_display_graph(headline, body_sents):
+    headline_root = [t for t in headline if t.dep_== "ROOT"][0]
+    body_roots = [[t for t in sent if t.dep_== "ROOT"][0] for sent in body_sents]
+    headline_graph = make_graph(headline_root)
+    body_graphs = [make_graph(r) for r in body_roots]
+    return {"headline":headline_graph, "body":body_graphs}
+
+
 def cosine_similarity(x,y):
     if all([a == 0 for a in x]) or all([a == 0 for a in y]):
         return 0
@@ -160,7 +179,7 @@ def get_summary(doc, subjects, n = 5):
             if t in subjects_:
                 score += 1
             elif t in negating_words or t in doubting_words or t in hedging_words:
-                score += 1
+                score += 1.5
         return score/word_count if word_count > 4 else 0
     sentences = [s for s in doc.sents]
     scored_sentences = [[idx, sent, score_sentence(sent)] for idx, sent in enumerate(sentences)]
@@ -534,6 +553,7 @@ def get_features_stance(headline_data, body_data, n_sent = 5):
         summary = get_summary(body, h_important_words, n_sent)
         first_summ_sentence = summary[0]
         summary_edges = [get_edges(s) for s in summary]
+        summary_graph = get_display_graph(headline, summary)
         
         summary_svos = [get_svos(s) for s in summary]
         summary_root_dist = [root_distance(body_graph, list(s[1].keys())[0]) for s in summary_svos]
@@ -646,5 +666,5 @@ def get_features_stance(headline_data, body_data, n_sent = 5):
             headline_sent + avg_body_sent + headline_sentics + avg_body_sentics
         )
         features.append(fts)
-        summary_graphs.append(summary_edges)
-    return features, summary_graphs
+        summary_graphs.append(summary_graph)
+    return features, summary_graphs, headline_subjs
