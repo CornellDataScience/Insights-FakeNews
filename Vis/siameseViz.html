@@ -374,7 +374,9 @@
     function scatter(x,y, container, title){
         let lr = linearRegression(x,y);
         let slope = lr.a;
+        let slope_rounded = +slope.toFixed(3);
         let intercept = lr.b;
+        let intercept_rounded = +intercept.toFixed(3);
         let x1 = 0;
         let x2 = Math.max(...x);
         let y1 = intercept;
@@ -429,6 +431,12 @@
 			.attr("y2", yScale(y2))
 			.attr("stroke", "black")
 			.attr("stroke-width", 1);
+        points
+            .append("text")
+			.text("y =  " + slope_rounded + "x + " + intercept_rounded)
+			.attr("class", "text-label")
+			.attr("x", function(d) {return xScale(x2) - 150;})
+			.attr("y", function(d) {return yScale(y2) - 30;});
         container.append("text")
             .text(`Headline ${title}`)
             .attr("transform", `translate(${320}, ${305})`)
