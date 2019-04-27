@@ -431,7 +431,8 @@
                 var btndiv = d3.select("body").append("div")
                     .attr("id","btnDiv")
                     .attr("class", "btn-group btn-group-toggle py-3").attr("data-toggle", "buttons")
-                    .style("margin-left", "25vw");
+                    .style("margin-left", "15vw");
+                btndiv.append("div").html("Key:<br><span style='color:red'>■</span>negating<br><span style='color:yellow'>■</span>hedging<br><span style='color:orange'>■</span>doubting<br><span style='color:blue'>■</span>subject").style("margin-right","5vw")
                 btndiv.append("button")
                     .attr("type", "button").attr("class", "btn btn-secondary border")
                     .attr("name", "options").attr("id", "option1").text("Root to Negating Word");
