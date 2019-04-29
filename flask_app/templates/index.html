@@ -182,6 +182,9 @@
     let subjects = [];
     let nd_nodes = {}; //negating/doubting words
     let curr_subjects = {}; //subjects for each offset
+    let curr_offset = []; //offset for arranging format of trees
+    let form_offset = 0;
+    let num_remove = 0; //nuber of trees we don't display
     let tooltip = d3.select("body") //tooltip mouseover
         .append("div").attr("class", "tooltip").style("opacity", 0);
 
@@ -432,17 +435,24 @@
                 dtsvg = d3.select("body").append("svg").attr("width", dtwidth).attr("height", dtheight);
                 var data = graphs[i].body;
                 data.unshift(graphs[i].headline);
-                console.log(data);
+                // console.log(data);
                 subjects = response.headline_subjs;
-                console.log(subjects);
+                // console.log(subjects);
                 data.forEach((d, i) => {
-                    drawDepTree(d, i);
+                    findTrees(d,i);
                 });
-                var btndiv = d3.select("body").append("div")
+                curr_offset.forEach((d,i) => {
+                    drawDepTree(data[d], d, form_offset);
+                    form_offset++;
+                });
+                let legbutcontainer = d3.select("body").append("div").attr("class","container");
+                let leg_but = legbutcontainer.append("div").attr("class","row");
+                let legend = leg_but.append("div").attr("class","col-1");
+                // legend.append("text").attr("x",50).attr("y",40).text("hi!");
+                var btndiv = leg_but.append("div")
                     .attr("id","btnDiv")
-                    .attr("class", "btn-group btn-group-toggle py-3").attr("data-toggle", "buttons")
-                    .style("margin-left", "15vw");
-                btndiv.append("div").html("Key:<br><span style='color:red'>■</span>negating<br><span style='color:yellow'>■</span>hedging<br><span style='color:orange'>■</span>doubting<br><span style='color:blue'>■</span>subject").style("margin-right","5vw")
+                    .attr("class", "col-9 btn-group btn-group-toggle").attr("data-toggle", "buttons");
+                legend.html("Key:<br><span style='color:red'>■</span>negating<br><span style='color:yellow'>■</span>hedging<br><span style='color:orange'>■</span>doubting<br><span style='color:blue'>■</span>subject")
                 btndiv.append("button")
                     .attr("type", "button").attr("class", "btn btn-secondary border")
                     .attr("name", "options").attr("id", "option1").text("Root to Negating Word");
@@ -458,18 +468,19 @@
                 let colors = ["red", "orange", "purple", "black"];
                 //buttons
                 d3.select("#option1").on("click", function () {
-                    for (let i = 0; i < 6; i++) {
-                        negate_to_root(nd_nodes[i], colors[0], i);
+                    for (let key in nd_nodes) {
+                        console.log(key,nd_nodes[key]);
+                        negate_to_root(nd_nodes[key], colors[0], key);
                     }
                 }).style("color", colors[0]).style("background-color", "white");
                 d3.select("#option2").on("click", function () {
-                    for (let i = 0; i < 6; i++) {
-                        ancestors(nd_nodes[i], colors[1], i);
+                    for (let key in nd_nodes) {
+                        ancestors(nd_nodes[key], colors[1], key);
                     }
                 }).style("color", colors[1]).style("background-color", "white");
                 d3.select("#option3").on("click", function () {
-                    for (let i = 0; i < 6; i++) {
-                        neg_sub(nd_nodes[i], curr_subjects[i], colors[2], i);
+                    for (let key in nd_nodes) {
+                        neg_sub(nd_nodes[key], curr_subjects[key], colors[2], key);
                     }
                 }).style("color", colors[2]).style("background-color", "white");
                 d3.select("#option4").on("click", function () {
@@ -828,9 +839,16 @@
         let par = results["parent"];
         if (par !== "") {
             while (neg.data.token !== par.data.token) {
-                d3.select("#" + "link" + neg.data.idx + neg.parent.data.idx + offset)
-                    .attr("stroke", color)
-                    .attr("stroke-width", 5);
+                let path = d3.select("#" + "link" + neg.data.idx + neg.parent.data.idx + offset);
+                let totalLength = path.node().getTotalLength();
+                path.attr("stroke", color)
+                    .attr("stroke-width", 5)
+                    .attr("stroke-dasharray", totalLength + " " + totalLength)
+                    .attr("stroke-dashoffset", totalLength)
+                    .transition()
+                    .duration(1000)
+                    .ease(d3.easeLinear)
+                    .attr("stroke-dashoffset", 0);
                 d3.select("#" + "node" + neg.data.idx + offset)
                     .attr("stroke", color)
                     .attr("stroke-width", 5);
@@ -838,9 +856,16 @@
             }
             d3.select("#" + "node" + neg.data.idx + offset).attr("stroke", color);
             while (sub.data.token !== par.data.token) {
-                d3.select("#" + "link" + sub.data.idx + sub.parent.data.idx + offset)
-                    .attr("stroke", color)
-                    .attr("stroke-width", 5);
+                let path = d3.select("#" + "link" + sub.data.idx + sub.parent.data.idx + offset);
+                let totalLength = path.node().getTotalLength();
+                path.attr("stroke", color)
+                    .attr("stroke-width", 5)
+                    .attr("stroke-dasharray", totalLength + " " + totalLength)
+                    .attr("stroke-dashoffset", totalLength)
+                    .transition()
+                    .duration(1000)
+                    .ease(d3.easeLinear)
+                    .attr("stroke-dashoffset", 0);
                 d3.select("#" + "node" + sub.data.idx + offset)
                     .attr("stroke", color)
                     .attr("stroke-width", 5);
@@ -864,9 +889,17 @@
         })
 
         while (curr_node.parent !== null) {
-            d3.select("#" + "link" + curr_node.data.idx + curr_node.parent.data.idx + offset)
-                .attr("stroke", color)
-                .attr("stroke-width", 5);
+            let path = d3.select("#" + "link" + curr_node.data.idx + curr_node.parent.data.idx + offset);
+            console.log("path:"+path);
+            let totalLength = path.node().getTotalLength();
+            path.attr("stroke", color)
+                .attr("stroke-width", 5)
+                .attr("stroke-dasharray", totalLength + " " + totalLength)
+                .attr("stroke-dashoffset", totalLength)
+                .transition()
+                .duration(1000)
+                .ease(d3.easeLinear)
+                .attr("stroke-dashoffset", 0);
             d3.select("#" + "node" + curr_node.data.idx + offset)
                 .attr("stroke", color)
                 .attr("stroke-width", 5);
@@ -885,9 +918,16 @@
             parenting = n.parent;
             childs = parenting.children;
             childs.forEach(function (child) {
-                d3.select("#" + "link" + child.data.idx + parenting.data.idx + offset)
-                    .attr("stroke", color)
-                    .attr("stroke-width", 5);
+                let path = d3.select("#" + "link" + child.data.idx + parenting.data.idx + offset);
+                let totalLength = path.node().getTotalLength();
+                path.attr("stroke", color)
+                    .attr("stroke-width", 5)
+                    .attr("stroke-dasharray", totalLength + " " + totalLength)
+                    .attr("stroke-dashoffset", totalLength)
+                    .transition()
+                    .duration(1000)
+                    .ease(d3.easeLinear)
+                    .attr("stroke-dashoffset", 0);
                 d3.select("#" + "node" + child.data.idx + offset)
                     .attr("stroke", color)
                     .attr("stroke-width", 5);
@@ -895,14 +935,42 @@
         })
     }
 
-    function drawDepTree(data, offset) {
+    function findTrees(data,offset){
+        var treemap = d3.tree();
+        var root = d3.hierarchy(data, (d) => d.children);
+        var treemap = treemap(root);
+        var nodes = treemap;
+        var links = treemap.descendants().slice(1);
+
+        //identifies which nodes are negating/doubting, iterates to root and colors path
+        nd_nodes[offset] = [];
+        curr_subjects[offset] = [];
+        let no_neg = true;
+        nodes.descendants().forEach(function (d) {
+            if (negating_words.includes(d.data.token) ||
+                doubting_words.includes(d.data.token)) {
+                nd_nodes[offset].push(d);
+                no_neg = false;
+            } else if (subjects.includes(d.data.token)) {
+                curr_subjects[offset].push(d);
+            }
+        });
+        if(no_neg && offset !== 0){
+            console.log("Deleting: " + offset);
+            delete nd_nodes[offset];
+            num_remove++;
+        } else curr_offset.push(offset);
+    }
+
+    function drawDepTree(data, offset, form_offset) {
+        // console.log(data, offset, num_remove);
         if (offset === 0) {
             dtwidth = window.innerWidth;
         } else {
-            dtwidth = window.innerWidth / 5;
+            dtwidth = window.innerWidth / (6-num_remove);
         }
         let vis_container = dtsvg.append("g").attr("transform",
-            `translate (${dtwidth * Math.max((offset-1),0)}, ${30 + Math.min(offset,1) * dtheight/2})`);
+            `translate (${dtwidth * Math.max((form_offset-1),0)}, ${30 + Math.min(form_offset,1) * dtheight/2})`);
         vis_container.append("text").text(function () {
                 if (offset === 0) return "Headline"
                 else return "Sentence " + offset;
@@ -975,7 +1043,6 @@
                 tooltip.html(html)
                     .style("left", (d3.event.pageX + 5) + "px")
                     .style("top", (d3.event.pageY + 5) + "px");
-                d3.select(this).style("cursor", "pointer");
             })
             .on("mouseout",function(d){
                 d3.select(this)
@@ -984,20 +1051,7 @@
                 tooltip.transition().duration(200)
                     .style("opacity", 0);
                 tooltip.html("");
-                d3.select(this).style("cursor", "");
             });
-
-        //identifies which nodes are negating/doubting, iterates to root and colors path
-        nd_nodes[offset] = [];
-        curr_subjects[offset] = [];
-        node.each(function (d) {
-            if (negating_words.includes(d.data.token) ||
-                doubting_words.includes(d.data.token)) {
-                nd_nodes[offset].push(d);
-            } else if (subjects.includes(d.data.token)) {
-                curr_subjects[offset].push(d);
-            }
-        });
 
         node.append("text")
             .text((d) => d.data.token)

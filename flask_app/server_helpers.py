@@ -15,11 +15,11 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sentic import SenticPhrase
-import en_coref_md
+# import en_coref_md
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 nlp = spacy.load('en_core_web_sm')
-coref = en_coref_md.load()
+# coref = en_coref_md.load()
 
 negating_words = set([
     "n't", "not", "no", 

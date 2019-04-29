@@ -23,8 +23,9 @@ def classify_helper(headline, bodies):
     headline_info = (nlp_h, headline_graph, headline_subj, headline_svo, headline_root_dist, headline_neg_ancestors, headline_edges) # not ready
     body_info = [] # not ready
     for body in bodies:
-        nlp_a = coref(preprocess(body))
-        nlp_b = nlp(nlp_a._.coref_resolved.lower())
+        # nlp_a = coref(preprocess(body))
+        # nlp_b = nlp(nlp_a._.coref_resolved.lower())
+        nlp_b = nlp(preprocess(body))
         body_processed = process_body(nlp_b, idf)
         body_graph = build_graph(nlp_b)
         body_info_rel.append(body_processed)
