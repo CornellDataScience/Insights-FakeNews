@@ -375,15 +375,45 @@
         return variance;
     }
 
+    function getRSquared(predict, data){
+        var yAxis = data;
+        var rPrediction = [];
+        var meanValue = 0;
+        var SStot = 0;
+        var SSres = 0;
+        var rSquared = 0;
+        let lr = linearRegression(predict,data);
+        let slope = lr.a;
+        let intercept = lr.b;
+        let ynew = [];
+        // SUM ALL VALUES
+        for (var n in yAxis) { meanValue += yAxis[n]; }
+        // GET MEAN VALUE
+        meanValue = (meanValue / yAxis.length);
+        for (var n in yAxis) { 
+            SStot += Math.pow(yAxis[n] - meanValue, 2); 
+            predict.forEach(function(d) {
+                rPrediction.push(slope*d + intercept);})
+            SSres += Math.pow(rPrediction[n] - yAxis[n], 2); 
+        }
+         // R SQUARED
+        rSquared = 1 - (SSres / SStot);
+        return {rSquared: rSquared};
+    }
+
     function scatter(x,y, container, title){
         let lr = linearRegression(x,y);
         let slope = lr.a;
+        let slope_rounded = +slope.toFixed(3);
         let intercept = lr.b;
+        let intercept_rounded = +intercept.toFixed(3);
         let x1 = 0;
         let x2 = Math.max(...x);
         let y1 = intercept;
         let y2 = slope*(Math.max(...x))+intercept;
-
+        let result = getRSquared(x,y);
+        let important_result = result.rSquared;
+        let important = +important_result.toFixed(4);
         let xScale = d3.scaleLinear()
             .domain(d3.extent(x))
             .range([0, 300]);
@@ -433,7 +463,18 @@
 			.attr("y2", yScale(y2))
 			.attr("stroke", "black")
 			.attr("stroke-width", 1);
-
+        points
+            .append("text")
+			.text("y =  " + slope_rounded + "x + " + intercept_rounded)
+			.attr("class", "text-label")
+			.attr("x", function(d) {return xScale(x2) - 150;})
+			.attr("y", function(d) {return yScale(y2) - 30;});
+        points
+            .append("text")
+			.text("r\u00b2 = " + important)
+			.attr("class", "text-label")
+			.attr("x", function(d) {return xScale(x2) - 150;})
+			.attr("y", function(d) {return yScale(y2) - 10;});
         container.append("text")
             .text(`Headline ${title}`)
             .attr("transform", `translate(${320}, ${305})`)
