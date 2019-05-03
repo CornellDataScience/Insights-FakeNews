@@ -67,7 +67,7 @@
                                     <a class="dropdown-item" href="#" onclick="updateView(1);return false;">Lowest Magnitude Response</a>
                                     <a class="dropdown-item" href="#" onclick="updateView(2);return false;">Highest Variance in Reponse</a>
                                     <a class="dropdown-item" href="#" onclick="updateView(3);return false;">Lowest Variance in Reponse</a>
-                                    <a class="dropdown-item" href="#" onclick="updateView(4);return false;">All Cells</a>
+                                    <a class="dropdown-item" href="#" onclick="updateView(4);return false;">Representative Cells</a>
                                 </div>
                         </div>
                         <div class="dropdown" style="margin-top:5px">
@@ -76,12 +76,12 @@
                                 Stances
                             </button>
                             <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                <a class="dropdown-item" href="#" onclick="updateData('correctAgree');return false;">Correctly Classified Agree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('correctDisagree');return false;">Correctly Classified Disagree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('correctDiscuss');return false;">Correctly Classified Discuss</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incAgree');return false;">Incorrectly Classified Agree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incDisagree');return false;">Incorrectly Classified Disagree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incDiscuss');return false;">Incorrectly Classified Discuss</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctAgree','activations','activations');return false;">Correctly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDisagree','activations');return false;">Correctly Classified Disagree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDiscuss','activations');return false;">Correctly Classified Discuss</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incAgree','activations');return false;">Incorrectly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDisagree','activations');return false;">Incorrectly Classified Disagree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDiscuss','activations');return false;">Incorrectly Classified Discuss</a>
                             </div>
                     </div>
                 </div>
@@ -147,7 +147,7 @@
             },
             width = 450 - margin.left - margin.right,
             height = 450 - margin.top - margin.bottom;
-        let text, bodyScale, headScale, actData;
+        let text, bodyScale, headScale, actData, currTitle;
 
         // Three function that change the tooltip when user hover / move / leave a cell
         function mouseover_word(word_act, groupID) {
@@ -183,7 +183,8 @@
                     showAttr(actData, headScale, bodyScale, "Lowest Variance Response", "bot5_var");
                     break;
                 case 4:
-                    break;
+                    updateData(currTitle, "representative");
+                    updateTitles("Representative Cells");
             }
 
             if (n <= 1) {
@@ -487,7 +488,8 @@
             .style("font-size", "0.7em");
     }
 
-    function updateData(title){
+    function updateData(title, accessor, update){
+        currTitle = title;
         console.log(title);
         d3.json(`activations_Siamese_${title}.json`, function(data){
             actData = data;
@@ -498,30 +500,36 @@
 
             bodyScale = d3.scaleSequential()
                 .interpolator(d3.interpolateRdYlBu)
-                .domain(getRange(data["activations"], false)); // could benefit from having a better domain, will make changes more distinct
+                .domain(getRange(data[accessor], false)); // could benefit from having a better domain, will make changes more distinct
 
             headScale = d3.scaleSequential()
                 .interpolator(d3.interpolateRdYlBu)
-                .domain(getRange(data["activations"], true));
+                .domain(getRange(data[accessor], true));
             
             text = data['remain_b'];
-            updateView(0);
+
+            if(update)updateView(0);
         });
     }
-    updateData('correctAgree_weighted');
+    updateData('correctAgree','activations',true);
     
-
-    function showAttr(data, headScale, bodyScale, title, accessor){
-        d3.selectAll(".cell").remove();
+    function updateTitles(title){
         let headlines = d3.selectAll(".attrTitle")["_groups"][0];
         d3.select(headlines[0]).text(`${title}: Headline Branch`)
             .style("margin-top","10px");
+        d3.select(headlines[1]).text(`${title}: Body Branch`);
+
+    }
+
+    function showAttr(data, headScale, bodyScale, title, accessor){
+        d3.selectAll(".cell").remove();
+        
+        updateTitles(title);
         actData["important_h"][accessor].forEach(function(cnum){
             cnum = Number(cnum);
             d3.select(".headlineCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
             showPair(actData["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
         });
-        d3.select(headlines[1]).text(`${title}: Body Branch`);
         actData["important_b"][accessor].forEach(function(cnum){
             cnum = Number(cnum);
             d3.select(".bodyCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
