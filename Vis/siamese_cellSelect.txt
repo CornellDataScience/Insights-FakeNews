@@ -76,12 +76,12 @@
                                 Stances
                             </button>
                             <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                <a class="dropdown-item" href="#" onclick="updateData('correctAgree');return false;">Correctly Classified Agree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('correctDisagree');return false;">Correctly Classified Disagree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('correctDiscuss');return false;">Correctly Classified Discuss</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incAgree');return false;">Incorrectly Classified Agree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incDisagree');return false;">Incorrectly Classified Disagree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incDiscuss');return false;">Incorrectly Classified Discuss</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctAgree_weighted');return false;">Correctly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDisagree_weighted');return false;">Correctly Classified Disagree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDiscuss_weighted');return false;">Correctly Classified Discuss</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incAgree_weighted');return false;">Incorrectly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDisagree_weighted');return false;">Incorrectly Classified Disagree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDiscuss_weighted');return false;">Incorrectly Classified Discuss</a>
                             </div>
                     </div>
                 </div>
