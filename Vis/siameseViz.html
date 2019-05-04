@@ -76,12 +76,12 @@
                                 Stances
                             </button>
                             <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                <a class="dropdown-item" href="#" onclick="updateData('correctAgree','activations','activations');return false;">Correctly Classified Agree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('correctDisagree','activations');return false;">Correctly Classified Disagree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('correctDiscuss','activations');return false;">Correctly Classified Discuss</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incAgree','activations');return false;">Incorrectly Classified Agree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incDisagree','activations');return false;">Incorrectly Classified Disagree</a>
-                                <a class="dropdown-item" href="#" onclick="updateData('incDiscuss','activations');return false;">Incorrectly Classified Discuss</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctAgree','activations', true);return false;">Correctly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDisagree','activations',true);return false;">Correctly Classified Disagree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('correctDiscuss','activations',true);return false;">Correctly Classified Discuss</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incAgree','activations',true);return false;">Incorrectly Classified Agree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDisagree','activations',true);return false;">Incorrectly Classified Disagree</a>
+                                <a class="dropdown-item" href="#" onclick="updateData('incDiscuss','activations',true);return false;">Incorrectly Classified Discuss</a>
                             </div>
                     </div>
                 </div>
@@ -147,7 +147,7 @@
             },
             width = 450 - margin.left - margin.right,
             height = 450 - margin.top - margin.bottom;
-        let text, bodyScale, headScale, actData, currTitle;
+        let text, bodyScale, headScale, actData, currTitle, currAttr, currAttrTitle;
 
         // Three function that change the tooltip when user hover / move / leave a cell
         function mouseover_word(word_act, groupID) {
@@ -171,27 +171,36 @@
 
             switch (n) {
                 case 0: // Highest mag resposne
-                    showAttr(actData, headScale, bodyScale, "Highest Magnitude Response", "top5_mag");
+                    currAttr = "top5_mag";
+                    currAttrTitle = "Highest Magnitude Response";
                     break;
                 case 1: // Lowest mag response
-                    showAttr(actData, headScale, bodyScale, "Lowest Magnitude Response", "bot5_mag");
+                    currAttr = "bot5_mag";
+                    currAttrTitle = "Lowest Magnitude Response";
+                    //showAttr(actData, headScale, bodyScale, "Lowest Magnitude Response", "bot5_mag");
                     break;
                 case 2: // Highest var response
-                    showAttr(actData, headScale, bodyScale, "Highest Variance Response", "top5_var");
+                     currAttr = "top5_var";
+                    currAttrTitle = "Highest Variance Response";
+                    //showAttr(actData, headScale, bodyScale, "Highest Variance Response", "top5_var");
                     break;
                 case 3: // Lowest var response
-                    showAttr(actData, headScale, bodyScale, "Lowest Variance Response", "bot5_var");
+                    currAttr = "bot5_var";
+                    currAttrTitle = "Lowest Variance Response";
+                    //showAttr(actData, headScale, bodyScale, "Lowest Variance Response", "bot5_var");
                     break;
                 case 4:
                     updateData(currTitle, "representative");
                     updateTitles("Representative Cells");
             }
+            showAttr(actData, headScale, bodyScale, currAttrTitle, currAttr);
 
             if (n <= 1) {
                 let mag_h = [],
                     mag_b = [];
                 actData["activations"].forEach(function(d, i) {
-                    var h = (d3.sum(kl)) ** 0.5;
+                    var h = (d3.sum(actData["activations"][i]["headline"]
+                        .map(d => Number(Object.values(d)[0]) ** 2))) ** 0.5;
                     var b = (d3.sum(
                         actData["activations"][i]["body"]
                         .map(d => Number(Object.values(d)[0]) ** 2))) ** 0.5;
@@ -508,7 +517,7 @@
             
             text = data['remain_b'];
 
-            if(update)updateView(0);
+            //if(update)updateView(0);
         });
     }
     updateData('correctAgree','activations',true);
