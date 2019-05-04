@@ -147,7 +147,8 @@
             },
             width = 450 - margin.left - margin.right,
             height = 450 - margin.top - margin.bottom;
-        let text, bodyScale, headScale, actData, currTitle, currAttr, currAttrTitle;
+        let text, bodyScale, headScale, actData, currTitle;
+        let currN = 0;
 
         // Three function that change the tooltip when user hover / move / leave a cell
         function mouseover_word(word_act, groupID) {
@@ -165,36 +166,40 @@
         // TODO: Add controls to select a headline/body to look at
         // TODO: Extract classification result so that can compare samples that are/n't classified correctly
         function updateView(n) {
-            console.log(n);
-            console.log(actData);
-            d3.select(".scatter").select("svg").remove();
+            //console.log(n);
+            //console.log(actData);
+            let currAttr, currAttrTitle;
+            currN = n;
 
+            d3.select(".scatter").select("svg").remove();
+           
             switch (n) {
                 case 0: // Highest mag resposne
                     currAttr = "top5_mag";
                     currAttrTitle = "Highest Magnitude Response";
+                    showAttr(actData, headScale, bodyScale, "Lowest Magnitude Response", "bot5_mag");
                     break;
                 case 1: // Lowest mag response
                     currAttr = "bot5_mag";
                     currAttrTitle = "Lowest Magnitude Response";
-                    //showAttr(actData, headScale, bodyScale, "Lowest Magnitude Response", "bot5_mag");
+                    showAttr(actData, headScale, bodyScale, "Lowest Magnitude Response", "bot5_mag");
                     break;
                 case 2: // Highest var response
-                     currAttr = "top5_var";
+                        currAttr = "top5_var";
                     currAttrTitle = "Highest Variance Response";
-                    //showAttr(actData, headScale, bodyScale, "Highest Variance Response", "top5_var");
+                    showAttr(actData, headScale, bodyScale, "Highest Variance Response", "top5_var");
                     break;
                 case 3: // Lowest var response
                     currAttr = "bot5_var";
                     currAttrTitle = "Lowest Variance Response";
-                    //showAttr(actData, headScale, bodyScale, "Lowest Variance Response", "bot5_var");
+                    showAttr(actData, headScale, bodyScale, "Lowest Variance Response", "bot5_var");
                     break;
                 case 4:
-                    updateData(currTitle, "representative");
+                   //updateData(currTitle, "representative");
                     updateTitles("Representative Cells");
+                    showAttr(actData['representative'], headScale, bodyScale, "Representative Cells");
             }
-            showAttr(actData, headScale, bodyScale, currAttrTitle, currAttr);
-
+        
             if (n <= 1) {
                 let mag_h = [],
                     mag_b = [];
@@ -497,29 +502,37 @@
             .style("font-size", "0.7em");
     }
 
-    function updateData(title, accessor, update){
+    function updateData(title, update){
+
         currTitle = title;
-        console.log(title);
+        //console.log(title);
+        console.log("Attribute Title", currAttrTitle);
         d3.json(`activations_Siamese_${title}.json`, function(data){
             actData = data;
-            console.log(data);
+            //console.log(data);
             var myColor = d3.scaleSequential()
                 .interpolator(d3.interpolateRdYlBu)
                 .domain([-1,1]); // could benefit from having a better domain, will make changes more distinct
 
             bodyScale = d3.scaleSequential()
                 .interpolator(d3.interpolateRdYlBu)
-                .domain(getRange(data[accessor], false)); // could benefit from having a better domain, will make changes more distinct
+                .domain(getRange(data['activations'], false)); // could benefit from having a better domain, will make changes more distinct
 
             headScale = d3.scaleSequential()
                 .interpolator(d3.interpolateRdYlBu)
-                .domain(getRange(data[accessor], true));
+                .domain(getRange(data['activations'], true));
             
             text = data['remain_b'];
 
+            updateView(currN);
+
             //if(update)updateView(0);
+            //showAttr(actData, headScale, bodyScale, currAttrTitle, currAttr);
         });
     }
+
+    currAttr = "top5_mag";
+    currAttrTitle = 'Highest Magnitude Response';
     updateData('correctAgree','activations',true);
     
     function updateTitles(title){
@@ -527,23 +540,39 @@
         d3.select(headlines[0]).text(`${title}: Headline Branch`)
             .style("margin-top","10px");
         d3.select(headlines[1]).text(`${title}: Body Branch`);
-
     }
 
     function showAttr(data, headScale, bodyScale, title, accessor){
-        d3.selectAll(".cell").remove();
+        d3.selectAll(".cell").remove();  
+        let data_h, data_b;
+        if(data['important_h']){
+            updateTitles(title);
+
+            console.log("NOT REP");
+            data_h = actData["important_h"][accessor];
+            data_b = actData["important_b"][accessor];
+
+            data_h.forEach(function(cnum){
+                cnum = Number(cnum);
+                d3.select(".headlineCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
+                showPair(actData["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
+            });
+            data_b.forEach(function(cnum){
+                cnum = Number(cnum);
+                d3.select(".bodyCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
+                showPair(actData["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
+            });
+        }
+        else{
+            console.log("REP");
+
+            data.forEach(function(d, cnum){
+                //cnum = Number(cnum);
+                d3.select(".bodyCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
+                showPair(d, headScale, bodyScale, `cell-${cnum}`);
+            });
+        }
         
-        updateTitles(title);
-        actData["important_h"][accessor].forEach(function(cnum){
-            cnum = Number(cnum);
-            d3.select(".headlineCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
-            showPair(actData["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
-        });
-        actData["important_b"][accessor].forEach(function(cnum){
-            cnum = Number(cnum);
-            d3.select(".bodyCells").append("div").attr("id", `cell-${cnum}`).attr("class", "cell");
-            showPair(actData["activations"][cnum], headScale, bodyScale, `cell-${cnum}`);
-        });
     }
     </script>
 </body>
